@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">
+<title>authdiff report</title>
+<style>
+:root{color-scheme:light dark;--bg:#f6f6f3;--surface:#fff;--ink:#1d2127;--muted:#586170;--line:#d8dbe0;--code:#eef0f3;--link:#1f4fbf;
+--crit:#a4161a;--high:#c2410c;--med:#8a6100;--low:#1f4fbf;--info:#586170;
+--allowed-bg:#dcefe2;--allowed-fg:#17532b;--denied-bg:#e7eaef;--denied-fg:#3b4350;--unexpected-bg:#f6d2d2;--unexpected-fg:#7f1013;--skipped-bg:#f6f6f3;--skipped-fg:#6b7482;--error-bg:#f8e7bd;--error-fg:#614200}
+@media (prefers-color-scheme:dark){:root{--bg:#111316;--surface:#191c20;--ink:#e6e8eb;--muted:#9aa3af;--line:#2e333a;--code:#22262b;--link:#86a8f5;
+--crit:#ff8a8d;--high:#ffa066;--med:#e3b341;--low:#86a8f5;--info:#9aa3af;
+--allowed-bg:#17321f;--allowed-fg:#8fd6a5;--denied-bg:#262b32;--denied-fg:#b4bcc8;--unexpected-bg:#4a1a1c;--unexpected-fg:#ffb3b5;--skipped-bg:#191c20;--skipped-fg:#7d8693;--error-bg:#3f3110;--error-fg:#f0cd7a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:24px 16px 64px}
+a{color:var(--link)}
+a:focus-visible,summary:focus-visible{outline:2px solid var(--link);outline-offset:2px}
+h1{font-size:1.6rem;margin:0 0 4px}
+h2{font-size:1.15rem;margin:40px 0 12px}
+.meta{color:var(--muted);margin:0;overflow-wrap:anywhere}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin:24px 0 0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px}
+.card b{display:block;font-size:1.6rem;line-height:1.2;font-variant-numeric:tabular-nums}
+.card span{color:var(--muted);font-size:.85rem}
+.card.critical b{color:var(--crit)}.card.high b{color:var(--high)}.card.medium b{color:var(--med)}.card.low b{color:var(--low)}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+tr:last-child th,tr:last-child td{border-bottom:0}
+thead th{font-weight:600;color:var(--muted);font-size:.85rem}
+tbody th{font-weight:500;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85rem}
+td.hm{padding:4px}
+.cell{display:flex;gap:6px;align-items:center;justify-content:center;min-width:112px;padding:6px 8px;border-radius:4px;font-size:.85rem;font-variant-numeric:tabular-nums}
+.cell i{font-style:normal;font-weight:700}
+.cell.allowed{background:var(--allowed-bg);color:var(--allowed-fg)}
+.cell.denied{background:var(--denied-bg);color:var(--denied-fg)}
+.cell.unexpected{background:var(--unexpected-bg);color:var(--unexpected-fg);font-weight:700;box-shadow:inset 0 0 0 2px var(--unexpected-fg)}
+.cell.skipped{background:var(--skipped-bg);color:var(--skipped-fg);border:1px dashed var(--line)}
+.cell.error{background:var(--error-bg);color:var(--error-fg)}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;padding:0;list-style:none}
+.legend .cell{min-width:0}
+.finding{background:var(--surface);border:1px solid var(--line);border-left-width:4px;border-radius:6px;padding:14px 16px;margin:0 0 14px}
+.finding.critical{border-left-color:var(--crit)}.finding.high{border-left-color:var(--high)}.finding.medium{border-left-color:var(--med)}.finding.low{border-left-color:var(--low)}.finding.info{border-left-color:var(--info)}
+.finding h3{margin:0 0 6px;font-size:1rem}
+.sev{display:inline-block;margin-right:8px;font-size:.75rem;font-weight:700;letter-spacing:.04em;padding:1px 7px;border-radius:3px;border:1px solid currentColor}
+.sev.critical{color:var(--crit)}.sev.high{color:var(--high)}.sev.medium{color:var(--med)}.sev.low{color:var(--low)}.sev.info{color:var(--info)}
+dl.facts{display:grid;grid-template-columns:max-content 1fr;gap:2px 16px;margin:8px 0;font-size:.9rem}
+dl.facts dt{color:var(--muted)}dl.facts dd{margin:0;overflow-wrap:anywhere}
+code,pre{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.82rem}
+pre{background:var(--code);padding:10px;border-radius:4px;overflow-x:auto;margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+details{margin-top:8px}
+summary{cursor:pointer;color:var(--muted)}
+.ex{border-top:1px solid var(--line);margin-top:10px;padding-top:6px}
+.empty{padding:20px;border:1px dashed var(--line);border-radius:6px;color:var(--muted)}
+@media (max-width:560px){dl.facts{grid-template-columns:1fr}dl.facts dt{margin-top:6px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<h1>authdiff report</h1>
+<p class="meta">{{.R.Target}} · {{.R.SpecPath}} · {{.R.Tool.Name}} {{.R.Tool.Version}}</p>
+<p class="meta">{{.R.StartedAt.Format "2006-01-02 15:04:05 MST"}}</p>
+</header>
+
+<section aria-label="Summary">
+<div class="cards">
+{{- range .Counts}}
+<div class="card {{.Severity}}"><b>{{.Count}}</b><span>{{.Severity}}</span></div>
+{{- end}}
+<div class="card"><b>{{.R.Stats.Requests}}</b><span>requests</span></div>
+<div class="card"><b>{{.R.Stats.Endpoints}}</b><span>endpoints</span></div>
+<div class="card"><b>{{.Duration}}</b><span>duration</span></div>
+</div>
+</section>
+
+<section>
+<h2>Authorization matrix</h2>
+{{if .Rows}}
+<ul class="legend" aria-label="Legend">
+{{- range .Legend}}
+<li class="cell {{.Class}}"><i aria-hidden="true">{{.Glyph}}</i> {{.Label}}</li>
+{{- end}}
+</ul>
+<div class="scroll" tabindex="0" role="region" aria-label="Endpoint by profile matrix">
+<table>
+<thead><tr><th scope="col">Endpoint</th>{{range .Profiles}}<th scope="col">{{.}}</th>{{end}}</tr></thead>
+<tbody>
+{{- range .Rows}}
+<tr><th scope="row">{{.Endpoint}}</th>{{range .Cells}}<td class="hm"><div class="cell {{.Class}}"><i aria-hidden="true">{{.Glyph}}</i> {{.Label}}</div></td>{{end}}</tr>
+{{- end}}
+</tbody>
+</table>
+</div>
+{{else}}
+<p class="empty">No matrix data was recorded for this scan.</p>
+{{end}}
+</section>
+
+<section>
+<h2>Findings</h2>
+{{if .Active}}
+{{range .Active}}
+<article class="finding {{.Severity}}" id="f-{{.ID}}">
+<h3><span class="sev {{.Severity}}">{{upper (printf "%s" .Severity)}}</span>{{.Title}}</h3>
+<dl class="facts">
+<dt>Rule</dt><dd><a href="{{helpURL .RuleID}}">{{.RuleID}}</a>{{if .OWASP}} · {{.OWASP}}{{end}}{{if .CWE}} · {{.CWE}}{{end}}</dd>
+<dt>Endpoint</dt><dd><code>{{.Method}} {{.Path}}</code></dd>
+{{- if or .Victim .Attacker}}
+<dt>Victim → attacker</dt><dd>{{.Victim}} → {{.Attacker}}</dd>
+{{- end}}
+<dt>Confidence</dt><dd>{{.Confidence}}</dd>
+<dt>Similarity</dt><dd>{{pct .Similarity}}</dd>
+<dt>ID</dt><dd><code>{{.ID}}</code></dd>
+</dl>
+{{if .Description}}<p>{{.Description}}</p>{{end}}
+{{if .Remediation}}<p><strong>Fix:</strong> {{.Remediation}} <a href="{{helpURL .RuleID}}">Rule guidance</a></p>{{end}}
+{{if .Evidence}}
+<details>
+<summary>Evidence ({{len .Evidence}})</summary>
+{{range .Evidence}}
+<div class="ex">
+<p><strong>{{.Step}}</strong> as {{.Profile}}: <code>{{.Method}} {{.URL}}</code> → {{.Status}}{{if .Truncated}} (truncated){{end}}</p>
+{{if .RequestHeaders}}<pre>{{range $k, $v := .RequestHeaders}}{{$k}}: {{$v}}
+{{end}}</pre>{{end}}
+{{if .RequestBody}}<pre>{{.RequestBody}}</pre>{{end}}
+{{if .ResponseHeaders}}<pre>{{range $k, $v := .ResponseHeaders}}{{$k}}: {{$v}}
+{{end}}</pre>{{end}}
+{{if .ResponseBody}}<pre>{{.ResponseBody}}</pre>{{end}}
+</div>
+{{end}}
+</details>
+{{end}}
+</article>
+{{end}}
+{{else}}
+<p class="empty">No findings.</p>
+{{end}}
+</section>
+
+{{if .Suppressed}}
+<section>
+<details>
+<summary>Suppressed findings ({{len .Suppressed}})</summary>
+<div class="scroll" style="margin-top:10px">
+<table>
+<thead><tr><th scope="col">Severity</th><th scope="col">Rule</th><th scope="col">Endpoint</th><th scope="col">Victim → attacker</th><th scope="col">ID</th></tr></thead>
+<tbody>
+{{- range .Suppressed}}
+<tr><td>{{.Severity}}</td><td>{{.RuleID}}</td><td><code>{{.Method}} {{.Path}}</code></td><td>{{.Victim}} → {{.Attacker}}</td><td><code>{{.ID}}</code></td></tr>
+{{- end}}
+</tbody>
+</table>
+</div>
+</details>
+</section>
+{{end}}
+</main>
+</body>
+</html>

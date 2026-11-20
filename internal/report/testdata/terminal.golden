@@ -1,0 +1,6 @@
+SEVERITY  RULE           ENDPOINT               ATTACKER→VICTIM  CONF
+────────  ─────────────  ─────────────────────  ───────────────  ──────
+CRITICAL  AD-NOAUTH-001  GET /orders/{orderId}  anon→alice       high
+HIGH      AD-BOLA-001    GET /orders/{orderId}  bob→alice        medium
+
+2 findings (1 suppressed) · 27 requests · 2.5s

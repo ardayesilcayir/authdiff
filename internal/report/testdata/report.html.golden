@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">
+<title>authdiff report</title>
+<style>
+:root{color-scheme:light dark;--bg:#f6f6f3;--surface:#fff;--ink:#1d2127;--muted:#586170;--line:#d8dbe0;--code:#eef0f3;--link:#1f4fbf;
+--crit:#a4161a;--high:#c2410c;--med:#8a6100;--low:#1f4fbf;--info:#586170;
+--allowed-bg:#dcefe2;--allowed-fg:#17532b;--denied-bg:#e7eaef;--denied-fg:#3b4350;--unexpected-bg:#f6d2d2;--unexpected-fg:#7f1013;--skipped-bg:#f6f6f3;--skipped-fg:#6b7482;--error-bg:#f8e7bd;--error-fg:#614200}
+@media (prefers-color-scheme:dark){:root{--bg:#111316;--surface:#191c20;--ink:#e6e8eb;--muted:#9aa3af;--line:#2e333a;--code:#22262b;--link:#86a8f5;
+--crit:#ff8a8d;--high:#ffa066;--med:#e3b341;--low:#86a8f5;--info:#9aa3af;
+--allowed-bg:#17321f;--allowed-fg:#8fd6a5;--denied-bg:#262b32;--denied-fg:#b4bcc8;--unexpected-bg:#4a1a1c;--unexpected-fg:#ffb3b5;--skipped-bg:#191c20;--skipped-fg:#7d8693;--error-bg:#3f3110;--error-fg:#f0cd7a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:24px 16px 64px}
+a{color:var(--link)}
+a:focus-visible,summary:focus-visible{outline:2px solid var(--link);outline-offset:2px}
+h1{font-size:1.6rem;margin:0 0 4px}
+h2{font-size:1.15rem;margin:40px 0 12px}
+.meta{color:var(--muted);margin:0;overflow-wrap:anywhere}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin:24px 0 0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px}
+.card b{display:block;font-size:1.6rem;line-height:1.2;font-variant-numeric:tabular-nums}
+.card span{color:var(--muted);font-size:.85rem}
+.card.critical b{color:var(--crit)}.card.high b{color:var(--high)}.card.medium b{color:var(--med)}.card.low b{color:var(--low)}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+tr:last-child th,tr:last-child td{border-bottom:0}
+thead th{font-weight:600;color:var(--muted);font-size:.85rem}
+tbody th{font-weight:500;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85rem}
+td.hm{padding:4px}
+.cell{display:flex;gap:6px;align-items:center;justify-content:center;min-width:112px;padding:6px 8px;border-radius:4px;font-size:.85rem;font-variant-numeric:tabular-nums}
+.cell i{font-style:normal;font-weight:700}
+.cell.allowed{background:var(--allowed-bg);color:var(--allowed-fg)}
+.cell.denied{background:var(--denied-bg);color:var(--denied-fg)}
+.cell.unexpected{background:var(--unexpected-bg);color:var(--unexpected-fg);font-weight:700;box-shadow:inset 0 0 0 2px var(--unexpected-fg)}
+.cell.skipped{background:var(--skipped-bg);color:var(--skipped-fg);border:1px dashed var(--line)}
+.cell.error{background:var(--error-bg);color:var(--error-fg)}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;padding:0;list-style:none}
+.legend .cell{min-width:0}
+.finding{background:var(--surface);border:1px solid var(--line);border-left-width:4px;border-radius:6px;padding:14px 16px;margin:0 0 14px}
+.finding.critical{border-left-color:var(--crit)}.finding.high{border-left-color:var(--high)}.finding.medium{border-left-color:var(--med)}.finding.low{border-left-color:var(--low)}.finding.info{border-left-color:var(--info)}
+.finding h3{margin:0 0 6px;font-size:1rem}
+.sev{display:inline-block;margin-right:8px;font-size:.75rem;font-weight:700;letter-spacing:.04em;padding:1px 7px;border-radius:3px;border:1px solid currentColor}
+.sev.critical{color:var(--crit)}.sev.high{color:var(--high)}.sev.medium{color:var(--med)}.sev.low{color:var(--low)}.sev.info{color:var(--info)}
+dl.facts{display:grid;grid-template-columns:max-content 1fr;gap:2px 16px;margin:8px 0;font-size:.9rem}
+dl.facts dt{color:var(--muted)}dl.facts dd{margin:0;overflow-wrap:anywhere}
+code,pre{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.82rem}
+pre{background:var(--code);padding:10px;border-radius:4px;overflow-x:auto;margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+details{margin-top:8px}
+summary{cursor:pointer;color:var(--muted)}
+.ex{border-top:1px solid var(--line);margin-top:10px;padding-top:6px}
+.empty{padding:20px;border:1px dashed var(--line);border-radius:6px;color:var(--muted)}
+@media (max-width:560px){dl.facts{grid-template-columns:1fr}dl.facts dt{margin-top:6px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<h1>authdiff report</h1>
+<p class="meta">http://localhost:8000 · specs\openapi.yaml · authdiff 0.1.0</p>
+<p class="meta">2026-01-02 03:04:05 UTC</p>
+</header>
+
+<section aria-label="Summary">
+<div class="cards">
+<div class="card critical"><b>1</b><span>critical</span></div>
+<div class="card high"><b>1</b><span>high</span></div>
+<div class="card medium"><b>0</b><span>medium</span></div>
+<div class="card low"><b>0</b><span>low</span></div>
+<div class="card info"><b>0</b><span>info</span></div>
+<div class="card"><b>27</b><span>requests</span></div>
+<div class="card"><b>3</b><span>endpoints</span></div>
+<div class="card"><b>2.5s</b><span>duration</span></div>
+</div>
+</section>
+
+<section>
+<h2>Authorization matrix</h2>
+
+<ul class="legend" aria-label="Legend">
+<li class="cell allowed"><i aria-hidden="true">✓</i> allowed</li>
+<li class="cell denied"><i aria-hidden="true">✕</i> denied</li>
+<li class="cell unexpected"><i aria-hidden="true">!</i> unexpected</li>
+<li class="cell skipped"><i aria-hidden="true">–</i> skipped</li>
+<li class="cell error"><i aria-hidden="true">?</i> error</li>
+</ul>
+<div class="scroll" tabindex="0" role="region" aria-label="Endpoint by profile matrix">
+<table>
+<thead><tr><th scope="col">Endpoint</th><th scope="col">alice</th><th scope="col">bob</th><th scope="col">anon</th></tr></thead>
+<tbody>
+<tr><th scope="row">GET /orders/{orderId}</th><td class="hm"><div class="cell allowed"><i aria-hidden="true">✓</i> 200 allowed</div></td><td class="hm"><div class="cell denied"><i aria-hidden="true">✕</i> 403 denied</div></td><td class="hm"><div class="cell unexpected"><i aria-hidden="true">!</i> 200 unexpected</div></td></tr>
+<tr><th scope="row">GET /users/{id}</th><td class="hm"><div class="cell skipped"><i aria-hidden="true">–</i> 200 skipped</div></td><td class="hm"><div class="cell error"><i aria-hidden="true">?</i> 200 error</div></td><td class="hm"><div class="cell allowed"><i aria-hidden="true">✓</i> 200 allowed</div></td></tr>
+<tr><th scope="row">DELETE /orders/{orderId}</th><td class="hm"><div class="cell denied"><i aria-hidden="true">✕</i> 403 denied</div></td><td class="hm"><div class="cell unexpected"><i aria-hidden="true">!</i> 200 unexpected</div></td><td class="hm"><div class="cell skipped"><i aria-hidden="true">–</i> 200 skipped</div></td></tr>
+</tbody>
+</table>
+</div>
+
+</section>
+
+<section>
+<h2>Findings</h2>
+
+
+<article class="finding critical" id="f-aaaaaaaaaaaa">
+<h3><span class="sev critical">CRITICAL</span>Endpoint reachable without authentication</h3>
+<dl class="facts">
+<dt>Rule</dt><dd><a href="https://github.com/ardayesilcayir/authdiff/blob/main/docs/rules/AD-NOAUTH-001.md">AD-NOAUTH-001</a> · API2:2023 · CWE-306</dd>
+<dt>Endpoint</dt><dd><code>GET /orders/{orderId}</code></dd>
+<dt>Victim → attacker</dt><dd>alice → anon</dd>
+<dt>Confidence</dt><dd>high</dd>
+<dt>Similarity</dt><dd>97%</dd>
+<dt>ID</dt><dd><code>aaaaaaaaaaaa</code></dd>
+</dl>
+<p>GET /orders/{orderId} returned 200 to anon.</p>
+<p><strong>Fix:</strong> Require authentication. <a href="https://github.com/ardayesilcayir/authdiff/blob/main/docs/rules/AD-NOAUTH-001.md">Rule guidance</a></p>
+
+<details>
+<summary>Evidence (1)</summary>
+
+<div class="ex">
+<p><strong>attacker</strong> as anon: <code>GET http://localhost:8000/orders/101</code> → 200</p>
+
+
+<pre>Content-Type: text/html
+</pre>
+<pre>&lt;script&gt;alert(1)&lt;/script&gt;</pre>
+</div>
+
+</details>
+
+</article>
+
+<article class="finding high" id="f-bbbbbbbbbbbb">
+<h3><span class="sev high">HIGH</span>Cross-user object read</h3>
+<dl class="facts">
+<dt>Rule</dt><dd><a href="https://github.com/ardayesilcayir/authdiff/blob/main/docs/rules/AD-BOLA-001.md">AD-BOLA-001</a> · API1:2023 · CWE-639</dd>
+<dt>Endpoint</dt><dd><code>GET /orders/{orderId}</code></dd>
+<dt>Victim → attacker</dt><dd>alice → bob</dd>
+<dt>Confidence</dt><dd>medium</dd>
+<dt>Similarity</dt><dd>91%</dd>
+<dt>ID</dt><dd><code>bbbbbbbbbbbb</code></dd>
+</dl>
+<p>bob read alice&#39;s order.</p>
+
+
+<details>
+<summary>Evidence (1)</summary>
+
+<div class="ex">
+<p><strong>victim</strong> as alice: <code>GET http://localhost:8000/orders/101</code> → 200</p>
+<pre>Authorization: ****abcd
+</pre>
+
+
+<pre>{&#34;id&#34;:101}</pre>
+</div>
+
+</details>
+
+</article>
+
+
+</section>
+
+
+<section>
+<details>
+<summary>Suppressed findings (1)</summary>
+<div class="scroll" style="margin-top:10px">
+<table>
+<thead><tr><th scope="col">Severity</th><th scope="col">Rule</th><th scope="col">Endpoint</th><th scope="col">Victim → attacker</th><th scope="col">ID</th></tr></thead>
+<tbody>
+<tr><td>high</td><td>AD-BOLA-001</td><td><code>GET /users/{id}</code></td><td>bob → alice</td><td><code>cccccccccccc</code></td></tr>
+</tbody>
+</table>
+</div>
+</details>
+</section>
+
+</main>
+</body>
+</html>
