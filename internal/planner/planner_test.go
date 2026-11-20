@@ -145,3 +145,15 @@ func TestBuildBodyFromExampleAndMethodOverride(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, r.Body)
 }
+
+func TestBuildDotSegmentIDsEscaped(t *testing.T) {
+	for id, want := range map[string]string{".": "/orders/%2E", "..": "/orders/%2E%2E"} {
+		p := identity.NewPool(&config.Config{})
+		p.Add("alice", "orderId", id)
+		b := NewBuilder("http://h", nil, p, names)
+		r, err := b.Build(spec.Endpoint{Method: "DELETE", Path: "/orders/{orderId}"}, "", "alice", nil)
+		require.NoError(t, err)
+		assert.Equal(t, want, r.Path)
+		assert.Equal(t, "http://h"+want, r.URL)
+	}
+}

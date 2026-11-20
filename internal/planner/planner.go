@@ -67,7 +67,7 @@ func (b *Builder) Build(ep spec.Endpoint, method, idSource string, extra map[str
 	for _, name := range ep.PathParams() {
 		val, owner := b.pathValue(ep, name, idSource)
 		req.IDSources[name] = owner
-		path = strings.ReplaceAll(path, "{"+name+"}", url.PathEscape(val))
+		path = strings.ReplaceAll(path, "{"+name+"}", escapeSegment(val))
 	}
 	req.Path = path
 
@@ -118,6 +118,18 @@ func (b *Builder) pathValue(ep spec.Endpoint, name, idSource string) (val, owner
 		}
 	}
 	return "1", ""
+}
+
+// escapeSegment path-escapes v and also encodes the dot segments "." and
+// "..", which PathEscape leaves alone and servers normalize away.
+func escapeSegment(v string) string {
+	switch v {
+	case ".":
+		return "%2E"
+	case "..":
+		return "%2E%2E"
+	}
+	return url.PathEscape(v)
 }
 
 func exampleOr1(v any) string {
