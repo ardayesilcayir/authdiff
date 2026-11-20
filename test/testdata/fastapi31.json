@@ -1,0 +1,155 @@
+{
+  "openapi": "3.1.0",
+  "info": {"title": "Vuln Lab", "version": "0.1.0"},
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {}}}
+          }
+        }
+      }
+    },
+    "/orders": {
+      "post": {
+        "tags": ["orders"],
+        "summary": "Create Order",
+        "operationId": "create_order_orders_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/OrderCreate"}
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OrderOut"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        },
+        "security": [{"HTTPBearer": []}]
+      }
+    },
+    "/orders/{orderId}": {
+      "get": {
+        "tags": ["orders"],
+        "summary": "Get Order",
+        "operationId": "get_order_orders__orderId__get",
+        "security": [{"HTTPBearer": []}],
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Orderid"}
+          },
+          {
+            "name": "expand",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [{"type": "string"}, {"type": "null"}],
+              "title": "Expand"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OrderOut"}}}
+          }
+        }
+      }
+    },
+    "/admin/users/{userId}": {
+      "delete": {
+        "tags": ["admin"],
+        "summary": "Delete User",
+        "operationId": "delete_user_admin_users__userId__delete",
+        "security": [{"HTTPBearer": []}],
+        "parameters": [
+          {"name": "userId", "in": "path", "required": true, "schema": {"type": "integer", "title": "Userid"}}
+        ],
+        "responses": {"204": {"description": "Successful Response"}}
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "OrderCreate": {
+        "type": "object",
+        "required": ["item", "quantity"],
+        "title": "OrderCreate",
+        "properties": {
+          "item": {"type": "string", "title": "Item"},
+          "quantity": {"type": "integer", "minimum": 1, "title": "Quantity"},
+          "note": {"type": ["string", "null"], "title": "Note"},
+          "coupon": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Coupon",
+            "examples": ["SAVE10"]
+          },
+          "owner_id": {
+            "anyOf": [{"type": "integer"}, {"type": "null"}],
+            "title": "Owner Id"
+          }
+        }
+      },
+      "OrderOut": {
+        "type": "object",
+        "required": ["id", "item", "owner_id"],
+        "title": "OrderOut",
+        "properties": {
+          "id": {"type": "integer", "title": "Id"},
+          "item": {"type": "string", "title": "Item"},
+          "quantity": {"type": "integer", "title": "Quantity"},
+          "owner_id": {"type": "integer", "title": "Owner Id"},
+          "customer": {"$ref": "#/components/schemas/Customer"}
+        }
+      },
+      "Customer": {
+        "type": "object",
+        "required": ["email"],
+        "title": "Customer",
+        "properties": {
+          "email": {"type": "string", "format": "email", "title": "Email"},
+          "phone": {"type": ["string", "null"], "title": "Phone"}
+        }
+      },
+      "HTTPValidationError": {
+        "type": "object",
+        "title": "HTTPValidationError",
+        "properties": {
+          "detail": {
+            "type": "array",
+            "title": "Detail",
+            "items": {"$ref": "#/components/schemas/ValidationError"}
+          }
+        }
+      },
+      "ValidationError": {
+        "type": "object",
+        "required": ["loc", "msg", "type"],
+        "title": "ValidationError",
+        "properties": {
+          "loc": {"type": "array", "items": {"anyOf": [{"type": "string"}, {"type": "integer"}]}, "title": "Location"},
+          "msg": {"type": "string", "title": "Message"},
+          "type": {"type": "string", "title": "Error Type"}
+        }
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {"type": "http", "scheme": "bearer"}
+    }
+  }
+}
