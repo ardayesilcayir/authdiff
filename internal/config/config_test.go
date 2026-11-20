@@ -106,9 +106,10 @@ func TestValidate(t *testing.T) {
 		{"failOn", func(c *Config) { c.Output.FailOn = "bogus" }, "failOn"},
 		{"format", func(c *Config) { c.Output.Formats = []string{"pdf"} }, "pdf"},
 		{"bad baseUrl", func(c *Config) { c.Target.BaseURL = "://x" }, "baseUrl"},
-		{"apikey fields", func(c *Config) { c.Profiles["alice"] = Profile{Auth: Auth{Type: "apikey", Token: "t"}} }, "name"},
+		{"apikey empty token", func(c *Config) { c.Profiles["alice"] = Profile{Auth: Auth{Type: "apikey", Name: "k"}} }, "token"},
+		{"apikey bad in", func(c *Config) { c.Profiles["alice"] = Profile{Auth: Auth{Type: "apikey", Token: "t", In: "body"}} }, "auth.in"},
 		{"basic fields", func(c *Config) { c.Profiles["alice"] = Profile{Auth: Auth{Type: "basic"}} }, "username"},
-		{"cookie token", func(c *Config) { c.Profiles["alice"] = Profile{Auth: Auth{Type: "cookie", Name: "s"}} }, "token"},
+		{"cookie empty token", func(c *Config) { c.Profiles["alice"] = Profile{Auth: Auth{Type: "cookie", Name: "s"}} }, "token"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -127,6 +128,13 @@ func TestValidateOK(t *testing.T) {
 	c.Output.Formats = []string{"terminal", "json", "sarif", "html"}
 	require.NoError(t, Validate(c))
 	c.Output.FailOn = ""
+	require.NoError(t, Validate(c))
+}
+
+func TestValidateNamelessCookieAndApikey(t *testing.T) {
+	c := validConfig()
+	c.Profiles["alice"] = Profile{Auth: Auth{Type: "cookie", Token: "session=abc; csrf=xyz"}}
+	c.Profiles["bob"] = Profile{Auth: Auth{Type: "apikey", Token: "k"}}
 	require.NoError(t, Validate(c))
 }
 

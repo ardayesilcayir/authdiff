@@ -79,12 +79,14 @@ func validateAuth(a Auth) error {
 			return errors.New("auth.token is required for bearer")
 		}
 	case "cookie":
-		if a.Name == "" || a.Token == "" {
-			return errors.New("auth.name and auth.token are required for cookie")
+		// An empty Name means Token is the full Cookie header value.
+		if a.Token == "" {
+			return errors.New("auth.token is required for cookie")
 		}
 	case "apikey":
-		if a.Name == "" || a.Token == "" {
-			return errors.New("auth.name and auth.token are required for apikey")
+		// Name is optional; identity.Apply supplies the default.
+		if a.Token == "" {
+			return errors.New("auth.token is required for apikey")
 		}
 		if a.In != "" && a.In != "header" && a.In != "query" {
 			return fmt.Errorf("auth.in must be header or query, got %q", a.In)
