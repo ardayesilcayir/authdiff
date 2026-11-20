@@ -1,1 +1,7 @@
 .superpowers/
+authdiff-out/
+dist/
+*.db
+__pycache__/
+.venv/
+coverage.out

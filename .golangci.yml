@@ -1,0 +1,10 @@
+version: "2"
+linters:
+  default: none
+  enable:
+    - gosec
+    - errcheck
+    - staticcheck
+    - govet
+    - revive
+    - misspell
