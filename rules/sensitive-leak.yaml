@@ -1,0 +1,12 @@
+id: AD-LEAK-001
+name: Sensitive data exposure
+owasp: "API3:2023"
+cwe: CWE-213
+severity: medium
+kind: leak
+description: >
+  A response exposes sensitive fields such as password hashes, tokens or internal identifiers.
+  Excessive data is returned to the caller.
+remediation: docs/rules/AD-LEAK-001.md
+applies:
+  methods: [GET]

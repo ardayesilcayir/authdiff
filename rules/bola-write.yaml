@@ -1,0 +1,25 @@
+id: AD-BOLA-002
+name: Broken object level authorization (write)
+owasp: "API1:2023"
+cwe: CWE-639
+severity: high
+description: >
+  A user can modify or delete an object owned by another user by supplying its identifier.
+  The state-changing request succeeds for a non-owner.
+remediation: docs/rules/AD-BOLA-002.md
+applies:
+  methods: [PUT, PATCH, DELETE]
+  pathHasParam: true
+  adminFunction: false
+steps:
+  - name: owner
+    as: owner
+    use: owner
+    method: GET
+  - name: attacker
+    as: other_user
+    use: owner
+match: owner.ok && attacker.ok
+confidence:
+  high: evidence(attacker.body, owner.identifiers)
+  medium: "true"

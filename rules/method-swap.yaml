@@ -1,0 +1,10 @@
+id: AD-METHOD-001
+name: HTTP method swap bypass
+owasp: "API5:2023"
+cwe: CWE-650
+severity: medium
+kind: methodswap
+description: >
+  An undocumented HTTP method on a protected path is accepted without the authorization applied to documented methods.
+  Switching the method bypasses access control.
+remediation: docs/rules/AD-METHOD-001.md

@@ -1,0 +1,10 @@
+id: AD-MATRIX-001
+name: Authorization matrix violation
+owasp: "API5:2023"
+cwe: CWE-285
+severity: high
+kind: matrix
+description: >
+  An identity is allowed to call an endpoint that the declared authorization matrix forbids for its role.
+  Observed access contradicts the expected policy.
+remediation: docs/rules/AD-MATRIX-001.md

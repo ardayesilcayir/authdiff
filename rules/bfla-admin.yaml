@@ -1,0 +1,25 @@
+id: AD-BFLA-001
+name: Broken function level authorization (admin function)
+owasp: "API5:2023"
+cwe: CWE-285
+severity: high
+description: >
+  A low-privileged user can call an administrative function.
+  The endpoint responds successfully to a non-admin identity.
+remediation: docs/rules/AD-BFLA-001.md
+applies:
+  adminFunction: true
+steps:
+  - name: admin
+    as: admin
+    use: low_priv
+    skipDestructive: true
+  - name: attacker
+    as: low_priv
+    use: low_priv
+victim: admin
+attacker: attacker
+match: attacker.ok && (!admin.sent || admin.ok)
+confidence:
+  high: admin.sent && similarity(admin.body, attacker.body) >= cfg.similarityThreshold
+  medium: "true"

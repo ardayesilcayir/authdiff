@@ -1,0 +1,33 @@
+id: AD-BOLA-001
+name: Broken object level authorization (read)
+owasp: "API1:2023"
+cwe: CWE-639
+severity: high
+description: >
+  A user can read an object owned by another user by supplying its identifier.
+  The response served to the non-owner matches the owner's response.
+remediation: docs/rules/AD-BOLA-001.md
+applies:
+  methods: [GET]
+  pathHasParam: true
+  adminFunction: false
+steps:
+  - name: owner
+    as: owner
+    use: owner
+    repeat: 2
+  - name: attacker
+    as: other_user
+    use: owner
+  - name: anon
+    as: anonymous
+    use: owner
+victim: owner
+attacker: attacker
+match: >
+  owner.ok && len(owner.body) > 0 && attacker.ok &&
+  !(anon.ok && similarity(owner.body, anon.body) >= cfg.similarityThreshold) &&
+  similarity(owner.body, attacker.body) >= cfg.similarityThreshold
+confidence:
+  high: evidence(attacker.body, owner.identifiers)
+  medium: "true"

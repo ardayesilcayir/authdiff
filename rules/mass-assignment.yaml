@@ -1,0 +1,13 @@
+id: AD-MASS-001
+name: Mass assignment
+owasp: "API3:2023"
+cwe: CWE-915
+severity: high
+kind: massassign
+description: >
+  The API binds client-supplied properties that should be server-controlled, such as roles or ownership.
+  Injected privileged fields are accepted and reflected.
+remediation: docs/rules/AD-MASS-001.md
+applies:
+  methods: [POST, PUT, PATCH]
+  requiresBody: true

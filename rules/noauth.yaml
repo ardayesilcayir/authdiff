@@ -1,0 +1,24 @@
+id: AD-NOAUTH-001
+name: Missing authentication
+owasp: "API2:2023"
+cwe: CWE-306
+severity: high
+description: >
+  An endpoint that should require authentication responds successfully to an anonymous request.
+  Unauthenticated callers can reach protected data or functions.
+remediation: docs/rules/AD-NOAUTH-001.md
+steps:
+  - name: ref
+    as: any_user
+    use: any_user
+  - name: anon
+    as: anonymous
+    use: any_user
+victim: ref
+attacker: anon
+match: >
+  anon.ok && (endpoint.secured || matrixForbids("anon") ||
+  evidence(anon.body, identifiers))
+confidence:
+  high: evidence(anon.body, identifiers)
+  medium: "true"
