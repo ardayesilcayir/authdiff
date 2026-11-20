@@ -1,0 +1,5 @@
+version: 1
+target: { baseUrl: "http://localhost:8000", spec: ./openapi.json }
+scope: { allowHosts: ["localhost:8000"], acknowledgeAuthorization: true }
+profiles:
+  anonymous: { auth: { type: none } }
