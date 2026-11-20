@@ -3,10 +3,12 @@ package engine
 import (
 	"context"
 	"errors"
+	"math"
 	"net/http"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ardayesilcayir/authdiff/internal/config"
 	"github.com/ardayesilcayir/authdiff/internal/finding"
@@ -621,12 +623,14 @@ func TestMatrixOutcomes(t *testing.T) {
 		{Endpoint: "GET /a", Profile: "carol", Sent: true, Status: 500},
 		{Endpoint: "GET /a", Profile: "dave", Err: "boom"},
 		{Endpoint: "GET /a", Profile: "erin", Sent: true, Status: 400},
+		{Endpoint: "GET /a", Profile: "frank", Sent: true, Status: 429},
 		{Endpoint: "GET /ghost", Profile: "alice", Sent: true, Status: 200},
 	}
 	fs := []finding.Finding{{Method: "GET", Path: "/a", Attacker: "alice"}}
 	cells := buildMatrix(obs, fs, map[string]bool{"GET /a": true})
 	want := map[string]finding.Outcome{"alice": finding.Unexpected, "bob": finding.Denied,
-		"carol": finding.Errored, "dave": finding.Errored, "erin": finding.Denied}
+		"carol": finding.Errored, "dave": finding.Errored, "erin": finding.Denied,
+		"frank": finding.Errored}
 	if len(cells) != len(want) {
 		t.Fatalf("cells = %+v", cells)
 	}
@@ -680,9 +684,10 @@ func (s errSender) Send(context.Context, *identity.Profile, string, planner.Requ
 }
 
 func TestContextCancelFailsRun(t *testing.T) {
-	cfg := testConfig("http://x")
-	_, err := Run(context.Background(), RunOptions{
-		Config:    cfg,
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	res, err := Run(ctx, RunOptions{
+		Config:    testConfig("http://x"),
 		Inventory: &spec.Inventory{Endpoints: []spec.Endpoint{epProducts}},
 		Rules:     templateRules(t, RuleNOAUTH),
 		Sender:    errSender{err: context.Canceled},
@@ -690,9 +695,127 @@ func TestContextCancelFailsRun(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("err = %v, want context.Canceled", err)
 	}
+	if res == nil {
+		t.Error("want a (partial) result alongside the cancellation error")
+	}
 }
 
-func TestEvalErrorFailsRun(t *testing.T) {
+func TestSenderDeadlineErrorWithoutCallerCancelIsProbeFailure(t *testing.T) {
+	// An error matching context.DeadlineExceeded (e.g. http.Client.Timeout)
+	// while the caller's ctx is alive is an ordinary failed probe.
+	res, err := Run(context.Background(), RunOptions{
+		Config:    testConfig("http://x"),
+		Inventory: &spec.Inventory{Endpoints: []spec.Endpoint{epProducts}},
+		Rules:     templateRules(t, RuleNOAUTH),
+		Sender:    errSender{err: context.DeadlineExceeded},
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(res.Matrix) == 0 {
+		t.Fatal("no cells")
+	}
+	for _, c := range res.Matrix {
+		if c.Outcome != finding.Errored {
+			t.Errorf("cell = %+v, want error", c)
+		}
+	}
+}
+
+func TestRequestTimeoutDoesNotAbortRun(t *testing.T) {
+	api := newAPI(t, func(w http.ResponseWriter, r *http.Request, _ string) {
+		if r.URL.Path == "/slow" {
+			select {
+			case <-time.After(2 * time.Second):
+			case <-r.Context().Done():
+			}
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"name": "Alice", "email": "alice@example.com"})
+	})
+	client, err := transport.New(transport.Options{AllowHosts: []string{api.host()}, Rate: 1000, Timeout: 100 * time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := Run(context.Background(), RunOptions{
+		Config:    testConfig(api.URL),
+		Inventory: &spec.Inventory{Endpoints: []spec.Endpoint{{Method: "GET", Path: "/slow"}, epProfile}},
+		Rules:     templateRules(t, RuleNOAUTH),
+		Client:    client,
+	})
+	if err != nil {
+		t.Fatalf("a timed-out request must not abort the run: %v", err)
+	}
+	if len(findingsOf(res, RuleNOAUTH)) != 1 {
+		t.Errorf("finding on the healthy endpoint lost: %+v", res.Findings)
+	}
+	var slowCells int
+	for _, c := range res.Matrix {
+		if c.Endpoint == "GET /slow" {
+			slowCells++
+			if c.Outcome != finding.Errored {
+				t.Errorf("slow cell = %+v, want error", c)
+			}
+		}
+	}
+	if slowCells == 0 || res.Stats.Errors == 0 {
+		t.Errorf("want errored slow cells and error stats: %+v %+v", res.Matrix, res.Stats)
+	}
+}
+
+func TestCancelReturnsPartialResult(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	api := newAPI(t, func(w http.ResponseWriter, r *http.Request, _ string) {
+		if r.Method == http.MethodPut {
+			cancel() // the user hits Ctrl-C while phase 2 runs
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"name": "Alice", "email": "alice@example.com"})
+	})
+	cfg := testConfig(api.URL)
+	cfg.Safety.AllowDestructive = true
+	res, err := Run(ctx, RunOptions{
+		Config:    cfg,
+		Inventory: &spec.Inventory{Endpoints: []spec.Endpoint{epProfile, {Method: "PUT", Path: "/users/me/profile"}}},
+		Rules:     templateRules(t, RuleNOAUTH),
+		Client:    newTestClient(t, api, true),
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+	if res == nil {
+		t.Fatal("want partial result")
+	}
+	if len(res.Findings) != 1 || res.Findings[0].Method != "GET" {
+		t.Errorf("phase-1 finding not kept: %+v", res.Findings)
+	}
+	if res.Stats.Requests == 0 || len(res.Matrix) == 0 || res.FinishedAt.IsZero() {
+		t.Errorf("partial result incomplete: stats %+v matrix %d", res.Stats, len(res.Matrix))
+	}
+}
+
+func TestBuildErrorSkipsCombination(t *testing.T) {
+	api := newAPI(t, func(w http.ResponseWriter, _ *http.Request, _ string) {
+		writeJSON(w, http.StatusOK, map[string]any{"email": "alice@example.com"})
+	})
+	cfg := testConfig(api.URL)
+	cfg.Bodies = map[string]any{"POST /orders": map[string]any{"qty": math.Inf(1)}} // not JSON-encodable
+	res := runScan(t, api, cfg, []spec.Endpoint{{Method: "POST", Path: "/orders"}, epProfile}, templateRules(t, RuleNOAUTH))
+	if len(findingsOf(res, RuleNOAUTH)) != 1 {
+		t.Errorf("other endpoint's finding lost: %+v", res.Findings)
+	}
+	var errored bool
+	for _, c := range res.Matrix {
+		if c.Endpoint == "POST /orders" && c.Outcome == finding.Errored {
+			errored = true
+		}
+	}
+	if !errored {
+		t.Errorf("want errored cell for unbuildable request: %+v", res.Matrix)
+	}
+}
+
+func TestEvalErrorSkipsCombination(t *testing.T) {
 	r := rules.Rule{ID: "AD-TEST-002", Name: "bad", Severity: "low",
 		Steps: []rules.Step{{Name: "a", As: "any_user", Use: "any_user"}},
 		Match: "a.json.missing.deeper == 1"}
@@ -702,11 +825,53 @@ func TestEvalErrorFailsRun(t *testing.T) {
 	api := newAPI(t, func(w http.ResponseWriter, _ *http.Request, _ string) {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	})
-	_, err := Run(context.Background(), RunOptions{
-		Config: testConfig(api.URL), Inventory: &spec.Inventory{Endpoints: []spec.Endpoint{epProducts}},
-		Rules: []rules.Rule{r}, Client: newTestClient(t, api, false),
+	cfg := testConfig(api.URL)
+	client := newTestClient(t, api, false)
+	res, err := Run(context.Background(), RunOptions{
+		Config: cfg, Inventory: &spec.Inventory{Endpoints: []spec.Endpoint{epProducts}},
+		Rules: []rules.Rule{r}, Client: client,
 	})
-	if err == nil || !strings.Contains(err.Error(), "AD-TEST-002") {
-		t.Errorf("err = %v, want rule eval error", err)
+	if err != nil {
+		t.Fatalf("eval error must not abort the run: %v", err)
+	}
+	if len(res.Findings) != 0 {
+		t.Errorf("findings = %+v", res.Findings)
+	}
+	checks, err := NewChecks([]rules.Rule{r})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := checks[0].Run(context.Background(), epProducts, newEnv(cfg, NewSender(client), nil))
+	if err != nil {
+		t.Fatalf("check.Run: %v", err)
+	}
+	var sawErr bool
+	for _, o := range out.Observations {
+		if strings.Contains(o.Err, "AD-TEST-002") && o.Profile == "admin" {
+			sawErr = true
+		}
+	}
+	if !sawErr {
+		t.Errorf("want an errored observation for the eval failure: %+v", out.Observations)
+	}
+}
+
+// failingCheck is a non-template check whose Run always fails.
+type failingCheck struct{ templateCheck }
+
+func (*failingCheck) Run(context.Context, spec.Endpoint, *Env) (Outcome, error) {
+	return Outcome{}, errors.New("check bug")
+}
+
+func TestCheckErrorDoesNotAbortRun(t *testing.T) {
+	registry["failing"] = func(r *rules.Rule) Check { return &failingCheck{templateCheck{rule: r}} }
+	defer delete(registry, "failing")
+	api := newAPI(t, func(w http.ResponseWriter, _ *http.Request, _ string) {
+		writeJSON(w, http.StatusOK, map[string]any{"email": "alice@example.com"})
+	})
+	rs := append(templateRules(t, RuleNOAUTH), rules.Rule{ID: "AD-FAIL-1", Kind: "failing"})
+	res := runScan(t, api, testConfig(api.URL), []spec.Endpoint{epProducts}, rs)
+	if len(findingsOf(res, RuleNOAUTH)) != 1 {
+		t.Errorf("a failing check must not discard others' findings: %+v", res.Findings)
 	}
 }

@@ -251,7 +251,11 @@ func (t *templateCheck) runBinding(ctx context.Context, ep spec.Endpoint, env *E
 		method := stepMethod(s, ep)
 		req, err := env.Builder.Build(ep, method, idSource(s, b), s.Body)
 		if err != nil {
-			return nil, obs, fmt.Errorf("rule %s step %s: %w", r.ID, s.Name, err)
+			// A body that cannot be built skips this combination, never the scan.
+			env.logger().Warn("build request", "rule", r.ID, "endpoint", ep.Key(), "step", s.Name, "err", err)
+			obs = append(obs, Observation{Endpoint: method + " " + ep.Path, Profile: sr.profile.Name,
+				Err: fmt.Sprintf("rule %s step %s: build request: %v", r.ID, s.Name, err)})
+			return nil, obs, nil
 		}
 		sr.req, sr.built = req, true
 		o := Observation{Endpoint: method + " " + ep.Path, Profile: sr.profile.Name, OwnIDs: req.OwnedBy(sr.profile.Name)}
@@ -261,11 +265,10 @@ func (t *templateCheck) runBinding(ctx context.Context, ep spec.Endpoint, env *E
 		}
 		resp, err := env.Sender.Send(ctx, sr.profile, s.Name, req)
 		if err != nil {
+			// Only the caller's cancellation aborts. A per-request timeout also
+			// matches context.DeadlineExceeded but is an ordinary failed probe.
 			if ctx.Err() != nil {
 				return nil, obs, ctx.Err()
-			}
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				return nil, obs, err
 			}
 			if !errors.Is(err, transport.ErrDestructiveBlocked) && !errors.Is(err, transport.ErrOutOfScope) {
 				o.Err = err.Error()
@@ -301,7 +304,12 @@ func (t *templateCheck) runBinding(ctx context.Context, ep spec.Endpoint, env *E
 	})
 	matched, conf, err := r.Eval(vm)
 	if err != nil {
-		return nil, obs, err
+		// A rule that cannot evaluate this response skips the combination. The
+		// error is recorded as an unsent observation of the attacker step; the
+		// matrix cell keeps the HTTP outcome of the requests actually sent.
+		env.logger().Warn("evaluate rule", "rule", r.ID, "endpoint", ep.Key(), "err", err)
+		obs = append(obs, Observation{Endpoint: ep.Key(), Profile: profileName(results[r.Attacker]), Err: err.Error()})
+		return nil, obs, nil
 	}
 	if !matched {
 		return nil, obs, nil

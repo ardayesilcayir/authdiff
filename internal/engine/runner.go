@@ -3,8 +3,8 @@ package engine
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -78,76 +78,90 @@ func Run(ctx context.Context, o RunOptions) (*finding.Result, error) {
 	env := newEnv(o.Config, sender, o.Log)
 	started := time.Now()
 
-	if err := harvest(ctx, env, o.Inventory); err != nil {
-		return nil, err
+	// finish assembles the result from whatever has been collected. It is
+	// also used on cancellation so callers can still write a partial report.
+	var findings []finding.Finding
+	var observations []Observation
+	eps := o.Inventory.Endpoints
+	finish := func(runErr error) (*finding.Result, error) {
+		merged := mergeFindings(findings)
+		finding.Sort(merged)
+		keys := make(map[string]bool, len(eps))
+		for _, ep := range eps {
+			keys[ep.Key()] = true
+		}
+		res := &finding.Result{
+			Tool:       finding.Tool{Name: "authdiff", Version: o.Version},
+			Target:     o.Config.Target.BaseURL,
+			SpecPath:   o.Inventory.SpecPath,
+			StartedAt:  started,
+			FinishedAt: time.Now(),
+			Profiles:   make([]string, 0, len(env.Profiles)),
+			Rules:      make([]finding.RuleMeta, 0, len(o.Rules)),
+			Findings:   merged,
+			Matrix:     buildMatrix(observations, merged, keys),
+			Stats:      finding.Stats{Endpoints: len(eps)},
+		}
+		for _, p := range env.Profiles {
+			res.Profiles = append(res.Profiles, p.Name)
+		}
+		for i := range o.Rules {
+			res.Rules = append(res.Rules, o.Rules[i].Meta())
+		}
+		if o.Client != nil {
+			res.Stats.Requests, res.Stats.Blocked, res.Stats.Errors = o.Client.Stats()
+		}
+		return res, runErr
 	}
 
-	eps := o.Inventory.Endpoints
+	if err := harvest(ctx, env, o.Inventory); err != nil {
+		return finish(err)
+	}
+
 	limit := o.Config.Safety.Concurrency
 	if limit < 1 {
 		limit = 4
 	}
-	var findings []finding.Finding
-	var observations []Observation
+	log := env.logger()
 	for _, phase := range phasesOf(eps, checks, env) {
 		outs := make([]Outcome, len(eps))
-		g, gctx := errgroup.WithContext(ctx)
+		var g errgroup.Group
 		g.SetLimit(limit)
 		for i, ep := range eps {
 			g.Go(func() error {
 				for _, c := range checks {
+					if ctx.Err() != nil {
+						return ctx.Err()
+					}
 					if c.Phase(ep) != phase || !c.Applies(ep, env) {
 						continue
 					}
-					out, err := c.Run(gctx, ep, env)
+					out, err := c.Run(ctx, ep, env)
 					outs[i].Findings = append(outs[i].Findings, out.Findings...)
 					outs[i].Observations = append(outs[i].Observations, out.Observations...)
 					if err != nil {
-						return fmt.Errorf("%s on %s: %w", c.Rule().ID, ep.Key(), err)
+						// Only the caller's cancellation stops the scan; a failing
+						// check loses its own endpoint result, nothing else.
+						if ctx.Err() != nil {
+							return ctx.Err()
+						}
+						log.Warn("check failed", "rule", c.Rule().ID, "endpoint", ep.Key(), "err", err)
 					}
 				}
 				return nil
 			})
 		}
-		if err := g.Wait(); err != nil {
-			return nil, err
-		}
+		err := g.Wait()
 		// Collected by endpoint index, so the order never depends on scheduling.
 		for _, out := range outs {
 			findings = append(findings, out.Findings...)
 			observations = append(observations, out.Observations...)
 		}
+		if err != nil {
+			return finish(err)
+		}
 	}
-
-	findings = mergeFindings(findings)
-	finding.Sort(findings)
-	keys := make(map[string]bool, len(eps))
-	for _, ep := range eps {
-		keys[ep.Key()] = true
-	}
-
-	res := &finding.Result{
-		Tool:       finding.Tool{Name: "authdiff", Version: o.Version},
-		Target:     o.Config.Target.BaseURL,
-		SpecPath:   o.Inventory.SpecPath,
-		StartedAt:  started,
-		FinishedAt: time.Now(),
-		Profiles:   make([]string, 0, len(env.Profiles)),
-		Rules:      make([]finding.RuleMeta, 0, len(o.Rules)),
-		Findings:   findings,
-		Matrix:     buildMatrix(observations, findings, keys),
-		Stats:      finding.Stats{Endpoints: len(eps)},
-	}
-	for _, p := range env.Profiles {
-		res.Profiles = append(res.Profiles, p.Name)
-	}
-	for i := range o.Rules {
-		res.Rules = append(res.Rules, o.Rules[i].Meta())
-	}
-	if o.Client != nil {
-		res.Stats.Requests, res.Stats.Blocked, res.Stats.Errors = o.Client.Stats()
-	}
-	return res, nil
+	return finish(ctx.Err())
 }
 
 // DryRun lists the requests a scan would send, in execution order, without
@@ -231,8 +245,8 @@ func harvest(ctx context.Context, env *Env, inv *spec.Inventory) error {
 }
 
 // buildMatrix turns observations into one cell per inventory endpoint and
-// profile, using the first sent observation: 2xx allowed; 401, 403, 404 and
-// other non-5xx statuses denied; 5xx error. A cell never sent is error when
+// profile, using the first sent observation: 2xx allowed; 429 and 5xx
+// error; any other status (401, 403, 404, 405, ...) denied. A cell never sent is error when
 // a probe failed, otherwise skipped. A profile that is the attacker of a
 // finding on the endpoint is unexpected.
 func buildMatrix(obs []Observation, fs []finding.Finding, endpoints map[string]bool) []finding.MatrixCell {
@@ -285,7 +299,7 @@ func statusOutcome(status int) finding.Outcome {
 	switch {
 	case status >= 200 && status < 300:
 		return finding.Allowed
-	case status >= 500:
+	case status >= 500, status == http.StatusTooManyRequests:
 		return finding.Errored
 	}
 	return finding.Denied
