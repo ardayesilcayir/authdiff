@@ -28,6 +28,22 @@ func TestRateLimit(t *testing.T) {
 	assert.GreaterOrEqual(t, perSec, 1.0)
 }
 
+func TestRateLimitSameTargetDifferentForms(t *testing.T) {
+	base, _ := countingBase()
+	rt := NewRateLimit(20, base)
+	urls := []string{"http://h/", "http://h:80/", "http://H./", "http://h:080/"}
+	const total = 30
+	start := time.Now()
+	for i := 0; i < total; i++ {
+		resp, err := rt.RoundTrip(mustReq(t, "GET", urls[i%len(urls)], ""))
+		require.NoError(t, err)
+		_ = resp.Body.Close()
+	}
+	perSec := float64(total) / time.Since(start).Seconds()
+	assert.LessOrEqual(t, perSec, 22.0, "equivalent host forms share one bucket")
+	assert.GreaterOrEqual(t, perSec, 1.0)
+}
+
 func TestRateLimitPerHost(t *testing.T) {
 	base, _ := countingBase()
 	rt := NewRateLimit(0.5, base) // one request every 2s per host

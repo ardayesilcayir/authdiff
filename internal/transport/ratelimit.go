@@ -38,9 +38,14 @@ func (r *rateLimit) limiter(host string) *rate.Limiter {
 }
 
 func (r *rateLimit) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Same normalization as scope, so equivalent forms of one target share a bucket.
 	host := ""
 	if req.URL != nil {
-		host = strings.ToLower(req.URL.Host)
+		if key, err := requestKey(req.URL); err == nil {
+			host = key
+		} else {
+			host = strings.ToLower(req.URL.Host)
+		}
 	}
 	if err := r.limiter(host).Wait(req.Context()); err != nil {
 		closeBody(req)
