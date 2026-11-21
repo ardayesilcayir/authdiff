@@ -5,15 +5,15 @@
 [![CodeQL](https://github.com/ardayesilcayir/authdiff/actions/workflows/codeql.yml/badge.svg)](https://github.com/ardayesilcayir/authdiff/actions/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**authdiff finds authorization bugs in REST APIs**: broken object level
-authorization (BOLA/IDOR), broken function level authorization (BFLA),
-missing authentication and mass assignment. Give it your OpenAPI spec and a
-few identities (admin, two users, anonymous). It calls every endpoint as
-every identity, compares the responses, and reports who could access what
-they should not, with masked request/response evidence, in the terminal,
-JSON, SARIF and HTML.
+**authdiff, REST API'lerdeki yetkilendirme açıklarını bulur**: nesne düzeyinde
+yetki ihlali (BOLA/IDOR), fonksiyon düzeyinde yetki ihlali (BFLA), kimlik
+doğrulamasız erişim ve mass assignment. OpenAPI dosyanızı ve birkaç kimliği
+(admin, iki kullanıcı, anonim) verirsiniz; authdiff her endpoint'i her
+kimlikle çağırır, yanıtları karşılaştırır ve kimin erişmemesi gereken veriye
+eriştiğini maskelenmiş istek/yanıt kanıtıyla terminal, JSON, SARIF ve HTML
+olarak raporlar.
 
-[Türkçe README](README.tr.md)
+[English README](README.en.md)
 
 ```
 SEVERITY  RULE           ENDPOINT                       ATTACKER→VICTIM  CONF
@@ -25,122 +25,124 @@ HIGH      AD-NOAUTH-001  GET /users/{userId}/profile    anonymous→admin  high
 MEDIUM    AD-LEAK-001    GET /users/{userId}            admin→admin      medium
 ```
 
-## Why
+## Neden
 
-An authorization bug has no signature: `GET /orders/42` is a perfectly valid
-request, it is only wrong when the caller does not own order 42. Generic
-scanners run with a single session and never ask "A can see this, should B?".
-Proxy plugins answer that question by hand and do not run in CI. authdiff
-turns it into a repeatable, CI-friendly test generated from your OpenAPI
-spec. The three authorization classes it targets are API1 (BOLA), API3
-(object property level, including mass assignment) and API5 (BFLA) of the
-[OWASP API Security Top 10 (2023)](https://owasp.org/API-Security/editions/2023/en/0x11-t10/).
+Yetki açığının bir "imzası" yoktur: `GET /orders/42` tamamen geçerli bir
+istektir; yalnızca isteği yapan kullanıcı 42 numaralı siparişin sahibi
+değilse hatalıdır. Genel tarayıcılar tek oturumla çalışır ve "A bunu
+görebiliyor, B görebilmeli mi?" sorusunu sormaz. Proxy eklentileri bu soruyu
+elle yanıtlar ve CI'da çalışmaz. authdiff bunu OpenAPI dosyanızdan üretilen,
+tekrarlanabilir ve CI'a bağlanabilir bir teste dönüştürür. Hedeflediği üç
+sınıf, [OWASP API Security Top 10 (2023)](https://owasp.org/API-Security/editions/2023/en/0x11-t10/)
+listesindeki API1 (BOLA), API3 (mass assignment dahil nesne özelliği düzeyinde
+yetki) ve API5'tir (BFLA).
 
-## Quick start: first results in 5 minutes
+## Hızlı başlangıç: 5 dakikada ilk sonuç
 
-You need Go 1.23+ and Docker. The bundled [vuln-lab](vuln-lab/) is a small,
-deliberately vulnerable shop API that runs on `127.0.0.1:8000` only.
+Go 1.23+ ve Docker gerekir. Depodaki [vuln-lab](vuln-lab/), yalnızca
+`127.0.0.1:8000` üzerinde çalışan, bilerek açıklı bırakılmış küçük bir
+e-ticaret API'sidir.
 
 ```sh
 git clone https://github.com/ardayesilcayir/authdiff && cd authdiff
-go install ./cmd/authdiff            # or: make build (writes dist/authdiff)
+go install ./cmd/authdiff            # ya da: make build (dist/authdiff üretir)
 
-make lab                             # start the vuln-lab (Docker), wait until healthy
+make lab                             # vuln-lab'ı başlatır (Docker), sağlıklı olana kadar bekler
 
-set -a; source examples/vuln-lab.env; set +a   # export the lab's FAKE tokens
+set -a; source examples/vuln-lab.env; set +a   # lab'ın SAHTE token'larını ortama aktarır
 authdiff scan -c examples/authdiff.yaml
 ```
 
-The scan prints the findings above and writes `authdiff-out/results.json`,
-`results.sarif` and `report.html`. Open `report.html` for the evidence and the
-endpoint × profile heat map. The exit code is `1` because findings reached
-`failOn: high`.
+Tarama yukarıdaki bulguları basar ve `authdiff-out/` altına `results.json`,
+`results.sarif` ve `report.html` yazar. Kanıtlar ve endpoint × profil ısı
+haritası için `report.html`'i açın. Bulgular `failOn: high` eşiğine ulaştığı
+için çıkış kodu `1` olur.
 
-By default destructive methods (`DELETE`, `PUT`, `PATCH`) are blocked.
-`POST` is **not** blocked: checks on `POST` operations (mass assignment,
-method swap) send real requests that create objects, even in safe mode. To find
-the write-side bugs as well (BOLA on `PATCH`, admin `DELETE`, mass
-assignment), allow them and restart the lab afterwards, because those checks
-change its data:
+Varsayılan olarak yıkıcı method'lar (`DELETE`, `PUT`, `PATCH`) engellenir.
+`POST` **engellenmez**: `POST` işlemlerindeki kontroller (mass assignment,
+method swap) güvenli modda da nesne oluşturan gerçek istekler gönderir.
+Yazma tarafındaki açıkları da (`PATCH` üzerinde BOLA, admin `DELETE`, mass
+assignment) bulmak için bunlara izin verin; bu kontroller lab verisini
+değiştirdiği için ardından lab'ı yeniden başlatın:
 
 ```sh
 authdiff scan -c examples/authdiff.yaml --allow-destructive
-make lab-restart                     # the lab reseeds on every start
+make lab-restart                     # lab her başlatmada seed verisiyle sıfırlanır
 ```
 
-PowerShell instead of `set -a; source ...`:
+`set -a; source ...` yerine PowerShell:
 
 ```powershell
 Get-Content examples/vuln-lab.env | Where-Object { $_ -match '^[A-Z_]+=' } |
   ForEach-Object { $k, $v = $_ -split '=', 2; Set-Item "env:$k" $v }
 ```
 
-Without Docker: `cd vuln-lab && python -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000`.
+Docker olmadan: `cd vuln-lab && python -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000`.
 
-## Install
+## Kurulum
 
-| Method | Command |
+| Yöntem | Komut |
 |---|---|
 | Go | `go install github.com/ardayesilcayir/authdiff/cmd/authdiff@latest` |
-| Release binary | Linux, macOS, Windows × amd64, arm64 from [Releases](https://github.com/ardayesilcayir/authdiff/releases), with `checksums.txt` |
-| Docker | `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -e ALICE_TOKEN ghcr.io/ardayesilcayir/authdiff scan -c authdiff.yaml` (see [Docker notes](#docker-notes)) |
-| GitHub Action | `uses: ardayesilcayir/authdiff/action@v1` (see [CI usage](#ci-usage)) |
+| Release binary | [Releases](https://github.com/ardayesilcayir/authdiff/releases) sayfasından Linux, macOS, Windows × amd64, arm64; `checksums.txt` ile |
+| Docker | `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -e ALICE_TOKEN ghcr.io/ardayesilcayir/authdiff scan -c authdiff.yaml` ([Docker notları](#docker-notları)) |
+| GitHub Action | `uses: ardayesilcayir/authdiff/action@v1` ([CI kullanımı](#ci-kullanımı)) |
 
-### Docker notes
+### Docker notları
 
-- `--user "$(id -u):$(id -g)"` makes the reports in the mounted directory
-  belong to you instead of the image's user (the image runs as non-root, which
-  cannot write to a directory it does not own).
-- `localhost` inside the container is the container itself. To scan an API
-  on the host, use `--network host` on Linux (then `localhost:8000` works
-  as-is), or `host.docker.internal` on Docker Desktop (macOS, Windows) and set
-  both `target.baseUrl` and `scope.allowHosts` to `host.docker.internal:8000`.
+- `--user "$(id -u):$(id -g)"` bağlanan dizindeki raporların imajın
+  kullanıcısına değil size ait olmasını sağlar (imaj root olmayan bir
+  kullanıcıyla çalışır ve sahibi olmadığı dizine yazamaz).
+- Konteyner içindeki `localhost` konteynerin kendisidir. Host üzerindeki bir
+  API'yi taramak için Linux'ta `--network host` kullanın (`localhost:8000`
+  olduğu gibi çalışır); Docker Desktop'ta (macOS, Windows) ise
+  `host.docker.internal` kullanın ve hem `target.baseUrl` hem
+  `scope.allowHosts` değerini `host.docker.internal:8000` yapın.
 
-## Features
+## Özellikler
 
-| Area | What authdiff does |
+| Alan | authdiff ne yapar |
 |---|---|
-| Input | OpenAPI 3.0 / 3.1, YAML or JSON, file or URL; path, query, header and body parameters filled from examples; `--include` / `--exclude` / `--tag` filters |
-| Identities | Any number of profiles: bearer, cookie, API key (header or query), basic, anonymous; secrets from `${env:NAME}` |
-| Ownership | `owns` per profile, automatic ID harvesting from the profile's own responses, optional authorization `matrix` |
-| BOLA | Read ([AD-BOLA-001](docs/rules/AD-BOLA-001.md)) and write ([AD-BOLA-002](docs/rules/AD-BOLA-002.md)): another user with the owner's IDs |
-| BFLA | Admin functions called by low-privileged users ([AD-BFLA-001](docs/rules/AD-BFLA-001.md)) |
-| Missing auth | Protected endpoints answering anonymous requests ([AD-NOAUTH-001](docs/rules/AD-NOAUTH-001.md)) |
-| Mass assignment | `role`, `isAdmin`, `ownerId` injected and read back ([AD-MASS-001](docs/rules/AD-MASS-001.md)) |
-| Method swap | Undocumented methods without authorization ([AD-METHOD-001](docs/rules/AD-METHOD-001.md)) |
-| Matrix | Observed access versus your declared policy ([AD-MATRIX-001](docs/rules/AD-MATRIX-001.md)) |
-| Data exposure | Sensitive fields outside the response schema ([AD-LEAK-001](docs/rules/AD-LEAK-001.md)) |
-| Comparison | Structural JSON similarity, dynamic fields learnt by repeating the owner request, anonymous baseline against public data, identifier evidence for confidence |
-| Custom rules | YAML templates with `expr` conditions, no Go code ([docs/writing-rules.md](docs/writing-rules.md)) |
-| Safety | Mandatory host allow-list (redirects included), authorization acknowledgement, 5 req/s default, destructive methods off, TLS verification on, 5 MB response limit, `--dry-run` |
-| Output | Terminal table, JSON, SARIF 2.1.0 (GitHub code scanning), single-file HTML report with heat map; tokens masked everywhere |
-| Workflow | Stable finding IDs, `.authdiff-ignore` baseline, `--fail-on` exit codes, `authdiff report` to re-render saved results |
+| Girdi | OpenAPI 3.0 / 3.1, YAML veya JSON, dosya veya URL; path, query, header ve body parametreleri örneklerden doldurulur; `--include` / `--exclude` / `--tag` filtreleri |
+| Kimlikler | İstenen sayıda profil: bearer, cookie, API key (header veya query), basic, anonim; gizli değerler `${env:NAME}` ile |
+| Sahiplik | Profil başına `owns`, profilin kendi yanıtlarından otomatik ID hasadı, isteğe bağlı yetki `matrix`'i |
+| BOLA | Okuma ([AD-BOLA-001](docs/rules/AD-BOLA-001.md)) ve yazma ([AD-BOLA-002](docs/rules/AD-BOLA-002.md)): sahibin ID'leriyle başka kullanıcı |
+| BFLA | Düşük yetkili kullanıcıların çağırdığı admin fonksiyonları ([AD-BFLA-001](docs/rules/AD-BFLA-001.md)) |
+| Kimliksiz erişim | Anonim isteğe yanıt veren korumalı endpoint'ler ([AD-NOAUTH-001](docs/rules/AD-NOAUTH-001.md)) |
+| Mass assignment | `role`, `isAdmin`, `ownerId` eklenip geri okunur ([AD-MASS-001](docs/rules/AD-MASS-001.md)) |
+| Method değiştirme | Yetki kontrolü olmayan, belgelenmemiş method'lar ([AD-METHOD-001](docs/rules/AD-METHOD-001.md)) |
+| Matris | Gözlenen erişim ile tanımladığınız politikanın karşılaştırması ([AD-MATRIX-001](docs/rules/AD-MATRIX-001.md)) |
+| Veri sızıntısı | Yanıt şemasında olmayan hassas alanlar ([AD-LEAK-001](docs/rules/AD-LEAK-001.md)) |
+| Karşılaştırma | Yapısal JSON benzerliği, sahip isteği tekrarlanarak öğrenilen dinamik alanlar, public veriye karşı anonim baseline, güven seviyesi için tanımlayıcı kanıtı |
+| Özel kurallar | `expr` koşullu YAML şablonları, Go kodu gerekmez ([docs/writing-rules.md](docs/writing-rules.md)) |
+| Güvenlik | Zorunlu host izin listesi (redirect'ler dahil), yetki beyanı, varsayılan 5 istek/sn, yıkıcı method'lar kapalı, TLS doğrulaması açık, 5 MB yanıt sınırı, `--dry-run` |
+| Çıktı | Terminal tablosu, JSON, SARIF 2.1.0 (GitHub code scanning), ısı haritalı tek dosya HTML rapor; token'lar her yerde maskeli |
+| İş akışı | Kararlı bulgu ID'leri, `.authdiff-ignore` baseline'ı, `--fail-on` çıkış kodları, kayıtlı sonuçtan `authdiff report` |
 
-## Usage
+## Kullanım
 
-| Command | What it does |
+| Komut | Ne yapar |
 |---|---|
-| `authdiff init` | Writes a commented `authdiff.yaml` and `.authdiff-ignore` |
-| `authdiff inventory -c authdiff.yaml` | Lists the endpoints from the spec; sends no requests (only downloads a URL spec) |
-| `authdiff scan -c authdiff.yaml` | Runs the scan |
-| `authdiff scan --dry-run` | Prints the request plan as a table, sends nothing to the target |
-| `authdiff rules list` / `rules validate <file>` | Lists rules / validates a custom rule |
-| `authdiff report -i results.json -f html` | Renders a saved result in another format |
-| `authdiff version` | Version, commit and build date |
+| `authdiff init` | Açıklamalı bir `authdiff.yaml` ve `.authdiff-ignore` yazar |
+| `authdiff inventory -c authdiff.yaml` | Spec'teki endpoint'leri listeler; istek atmaz (yalnızca URL spec'i indirir) |
+| `authdiff scan -c authdiff.yaml` | Taramayı çalıştırır |
+| `authdiff scan --dry-run` | İstek planını tablo olarak basar, hedefe hiçbir şey göndermez |
+| `authdiff rules list` / `rules validate <dosya>` | Kuralları listeler / özel kuralı doğrular |
+| `authdiff report -i results.json -f html` | Kayıtlı sonucu başka formatta üretir |
+| `authdiff version` | Sürüm, commit ve build tarihi |
 
-Common `scan` flags: `--rate 5`, `--concurrency 4`, `--allow-destructive`,
-`--fail-on high`, `--format terminal,json,sarif,html`, `--output ./out`,
-`--include "/orders/**"`, `--rules ./rules`, `--ignore-file`, `--insecure`,
-`--proxy`.
-Global: `-v`, `--log-format json`, `--no-color`.
+Sık kullanılan `scan` bayrakları: `--rate 5`, `--concurrency 4`,
+`--allow-destructive`, `--fail-on high`, `--format terminal,json,sarif,html`,
+`--output ./out`, `--include "/orders/**"`, `--rules ./rules`,
+`--ignore-file`, `--insecure`, `--proxy`. Genel: `-v`, `--log-format json`, `--no-color`.
 
-Exit codes: `0` no active finding at the `--fail-on` threshold, `1` threshold
-reached, `2` error, including a scan in which no request received an HTTP
-response (nothing was tested). The summary line shows requests, blocked
-requests and errors; a warning names every authenticated profile that never
-got a `2xx` (usually a wrong or expired token).
+Çıkış kodları: `0` `--fail-on` eşiğinde aktif bulgu yok, `1` eşik aşıldı,
+`2` hata; hiçbir isteğin HTTP yanıtı almadığı (yani hiçbir şeyin test
+edilmediği) taramalar da `2` ile biter. Özet satırı istek, engellenen istek ve
+hata sayılarını gösterir; hiç `2xx` almayan her kimlikli profil için uyarı
+yazılır (genellikle yanlış veya süresi dolmuş token).
 
-A minimal config:
+En küçük yapılandırma:
 
 ```yaml
 version: 1
@@ -149,20 +151,21 @@ target:
   spec: ./openapi.yaml
 scope:
   allowHosts: ["staging.example.com"]
-  acknowledgeAuthorization: true     # you are authorized to test this system
+  acknowledgeAuthorization: true     # bu sistemi test etme izniniz var
 profiles:
   alice: { role: user, auth: { type: bearer, token: "${env:ALICE_TOKEN}" }, owns: { orderId: [101] } }
   bob:   { role: user, auth: { type: bearer, token: "${env:BOB_TOKEN}" },   owns: { orderId: [201] } }
   anonymous: { role: none, auth: { type: none } }
 ```
 
-Every option is described in [docs/configuration.md](docs/configuration.md).
+Tüm seçenekler [docs/configuration.md](docs/configuration.md) dosyasında
+(İngilizce) anlatılır.
 
-## CI usage
+## CI kullanımı
 
-The composite GitHub Action installs authdiff, runs the scan, uploads the
-SARIF to code scanning (findings appear under **Security → Code scanning**)
-and fails the job at the `fail-on` threshold:
+Composite GitHub Action authdiff'i kurar, taramayı çalıştırır, SARIF'i code
+scanning'e yükler (bulgular **Security → Code scanning** altında görünür) ve
+`fail-on` eşiğinde job'u kırar:
 
 ```yaml
 permissions:
@@ -176,94 +179,98 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ardayesilcayir/authdiff/action@v1
         with:
-          config: authdiff.yaml      # required
-          version: v1.0.0            # default: latest; pin a tag for reproducible CI
-          fail-on: high              # default: high
-          upload-sarif: "true"       # default: true
+          config: authdiff.yaml      # zorunlu
+          version: v1.0.0            # varsayılan: latest; tekrarlanabilir CI için bir tag sabitleyin
+          fail-on: high              # varsayılan: high
+          upload-sarif: "true"       # varsayılan: true
         env:
           ALICE_TOKEN: ${{ secrets.AUTHDIFF_ALICE_TOKEN }}
           BOB_TOKEN: ${{ secrets.AUTHDIFF_BOB_TOKEN }}
 ```
 
-A complete workflow is in [examples/workflow.yml](examples/workflow.yml); it
-skips pull requests from forks, which get no secrets. Use
-a spec file from the repository (`target.spec: ./openapi.yaml`) so SARIF
-results point at the operation's line. Point CI at a staging or test
-environment, never at production, and keep destructive checks off unless the
-environment is reset after each run.
+Eksiksiz bir workflow [examples/workflow.yml](examples/workflow.yml)
+dosyasındadır; secret almayan fork'lardan gelen pull request'leri atlar.
+SARIF sonuçlarının operasyonun satırını göstermesi için depodaki bir spec
+dosyasını kullanın (`target.spec: ./openapi.yaml`). CI'ı üretime değil,
+staging veya test ortamına yönlendirin; ortam her çalıştırmadan sonra
+sıfırlanmıyorsa yıkıcı kontrolleri kapalı tutun.
 
-Other CI systems: run the binary or the Docker image and use the exit code;
-`results.sarif` and `results.json` are standard files.
+Diğer CI sistemleri: binary'yi veya Docker imajını çalıştırıp çıkış kodunu
+kullanın; `results.sarif` ve `results.json` standart dosyalardır.
 
-## Ethical use
+## Etik kullanım
 
-authdiff is built for systems **you own or have written permission to
-test**. Unauthorized access to computer systems is a crime in most countries;
-in Türkiye it falls under Articles 243 and 244 of the Turkish Penal Code (TCK
-243–244: unlawful access to an information system, and hindering, disrupting
-or altering data). You are responsible for how you use this tool.
+authdiff **sahibi olduğunuz veya yazılı test izni aldığınız** sistemler için
+tasarlanmıştır. İzinsiz sisteme erişim çoğu ülkede suçtur; Türkiye'de Türk
+Ceza Kanunu'nun 243. (bilişim sistemine girme) ve 244. (sistemi engelleme,
+bozma, verileri yok etme veya değiştirme) maddeleri kapsamına girer. Aracı
+nasıl kullandığınızdan siz sorumlusunuz.
 
-The safety defaults are "off" and stay that way unless you change them:
+Güvenlik varsayılanları "kapalı" başlar ve siz değiştirmedikçe öyle kalır:
 
-- No scan without `scope.allowHosts` and `acknowledgeAuthorization: true`.
-- No request outside `allowHosts`, redirects included; the spec download is
-  checked too.
-- 5 requests per second by default; `DELETE`, `PUT` and `PATCH` blocked
-  unless `--allow-destructive`. `POST` requests are sent in safe mode and
-  create objects. Even with `--allow-destructive`, a destructive request is
-  sent only for object IDs a configured profile owns, never as an admin by
-  method swap, and `DELETE` checks run one at a time.
-- A self-identifying `User-Agent: authdiff/<version>
-  (+https://github.com/ardayesilcayir/authdiff)`, so system owners can
-  recognize the traffic.
-- No brute force, credential guessing or denial-of-service features, by
-  design.
-- Tokens are masked in logs and every report (target-issued JWTs too); the
-  HTML report escapes target content and ships a Content Security Policy;
-  spec text printed to the terminal has control characters removed.
-- Reports contain the target's response data and are sensitive: they are
-  written owner-only (`0700` directory, `0600` files) and never through a
-  symlink. Do not commit or publish them.
-- TLS verification is on by default; `--insecure` is logged as a warning and
-  shown in every report.
-- Redirects that downgrade `https` to `http` or go to a different
-  `host:port` are refused, so credentials are never forwarded.
-- `HTTP_PROXY` / `HTTPS_PROXY` are ignored; a proxy is used only when set
-  with `safety.proxy` or `--proxy` (logged at start).
-- Network errors are retried only for `GET`/`HEAD`/`OPTIONS`, so a write is
-  never sent twice because of a dropped connection.
+- `scope.allowHosts` ve `acknowledgeAuthorization: true` olmadan tarama
+  başlamaz.
+- Redirect'ler dahil `allowHosts` dışına istek gitmez; spec indirme de
+  denetlenir.
+- Varsayılan 5 istek/sn; `--allow-destructive` olmadan `DELETE`, `PUT` ve
+  `PATCH` engellenir. `POST` istekleri güvenli modda da gönderilir ve nesne
+  oluşturur. `--allow-destructive` ile bile yıkıcı istek yalnızca bir
+  profilin sahip olduğu nesne ID'leri için gönderilir, method swap hiçbir
+  zaman admin olarak denemez ve `DELETE` kontrolleri tek tek çalışır.
+- Kendini tanıtan `User-Agent: authdiff/<sürüm>
+  (+https://github.com/ardayesilcayir/authdiff)`; sistem sahibi trafiği
+  tanıyabilir.
+- Kaba kuvvet, kimlik bilgisi tahmini veya DoS özelliği bilinçli olarak
+  yoktur.
+- Token'lar log'larda ve tüm raporlarda maskelenir (hedefin ürettiği JWT'ler
+  dahil); HTML rapor hedeften gelen içeriği escape eder ve Content Security
+  Policy içerir; terminale basılan spec metinlerinden kontrol karakterleri
+  temizlenir.
+- Raporlar hedefin yanıt verisini içerir ve hassastır: yalnızca sahibine açık
+  (`0700` dizin, `0600` dosya) yazılır, symlink üzerinden asla yazılmaz.
+  Commit etmeyin, yayımlamayın.
+- TLS doğrulaması varsayılan olarak açıktır; `--insecure` uyarı olarak
+  loglanır ve her raporda gösterilir.
+- `https`'ten `http`'ye düşüren veya farklı bir `host:port`'a giden
+  redirect'ler reddedilir; kimlik bilgileri başka yere iletilmez.
+- `HTTP_PROXY` / `HTTPS_PROXY` yok sayılır; proxy yalnızca `safety.proxy` veya
+  `--proxy` ile verildiğinde kullanılır (başlangıçta loglanır).
+- Ağ hataları yalnızca `GET`/`HEAD`/`OPTIONS` için yeniden denenir; bağlantı
+  koptu diye bir yazma isteği iki kez gönderilmez.
 
-For bug bounty programs, read the program's scope and rules first, use a low
-`--rate`, and test only with accounts you control.
+Bug bounty programlarında önce programın kapsamını ve kurallarını okuyun,
+düşük bir `--rate` kullanın ve yalnızca kontrolünüzdeki hesaplarla test edin.
 
-## Documentation
+## Dokümantasyon
 
-- [Configuration reference](docs/configuration.md)
-- [Writing rules](docs/writing-rules.md)
-- [Rule reference](docs/rules/): what each rule finds, how it works, how to fix it
-- [Architecture](docs/architecture.md) and decisions: [ADR-0001 Go](docs/adr/0001-go-secimi.md), [ADR-0002 comparison algorithm](docs/adr/0002-karsilastirma-algoritmasi.md)
-- [vuln-lab](vuln-lab/README.md) and its [expected findings](vuln-lab/VULNERABILITIES.md)
+Dokümantasyon İngilizcedir:
 
-## Development
+- [Yapılandırma başvurusu](docs/configuration.md)
+- [Kural yazma](docs/writing-rules.md)
+- [Kural başvurusu](docs/rules/): her kural ne bulur, nasıl çalışır, nasıl düzeltilir
+- [Mimari](docs/architecture.md) ve kararlar: [ADR-0001 Go](docs/adr/0001-go-secimi.md), [ADR-0002 karşılaştırma algoritması](docs/adr/0002-karsilastirma-algoritmasi.md)
+- [vuln-lab](vuln-lab/README.md) ve [beklenen bulguları](vuln-lab/VULNERABILITIES.md)
+
+## Geliştirme
 
 ```sh
-go test ./...                 # unit, engine and golden tests
-make cover                    # internal/ coverage (CI requires >= 80%)
+go test ./...                 # birim, motor ve golden testleri
+make cover                    # internal/ kapsamı (CI ≥ %80 ister)
 make lint                     # golangci-lint
-make e2e                      # recreates the vuln-lab, then the end-to-end test
+make e2e                      # vuln-lab'ı yeniden oluşturur, ardından uçtan uca test
 ```
 
-The end-to-end test runs a destructive scan against a fresh vuln-lab and
-requires the found `(rule, method, path)` set to equal the oracle in
-[VULNERABILITIES.md](vuln-lab/VULNERABILITIES.md), with no finding on the
-negative controls. It logs recall and false positive rate (currently 1.00 and
-0.00). The lab keeps its data in memory and reseeds on start; `make e2e`
-recreates the container first, because a previous destructive scan changes
-the data.
+Uçtan uca test, temiz bir vuln-lab'a karşı yıkıcı bir tarama çalıştırır ve
+bulunan `(rule, method, path)` kümesinin
+[VULNERABILITIES.md](vuln-lab/VULNERABILITIES.md) içindeki listeye eşit
+olmasını, negatif kontrollerde hiç bulgu çıkmamasını ister. Recall ve yanlış
+pozitif oranını basar (şu an 1.00 ve 0.00). Lab verisini bellekte tutar ve
+her başlatmada sıfırlanır; önceki yıkıcı tarama veriyi değiştirdiği için
+`make e2e` önce container'ı yeniden oluşturur.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Security issues in authdiff itself:
-[SECURITY.md](SECURITY.md).
+Bkz. [CONTRIBUTING.md](CONTRIBUTING.md). authdiff'in kendisindeki güvenlik
+açıkları için: [SECURITY.md](SECURITY.md).
 
-## License
+## Lisans
 
 [MIT](LICENSE)

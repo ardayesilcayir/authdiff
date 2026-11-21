@@ -39,8 +39,9 @@ Always recreate it before an e2e run (`make e2e` does this for you).
 
 ## Code guidelines
 
-- Code, comments and docs are in English. `README.tr.md` is the Turkish
-  translation of `README.md`; update both when you change the README.
+- Code, comments and docs are in English. `README.md` is Turkish and
+  `README.en.md` is the English version; update both together when you change
+  the README.
 - Package boundaries are deliberate: only `internal/cli` imports cobra,
   `internal/report` imports only `internal/finding`, and **only
   `internal/transport` touches the network**. New checks must send requests
