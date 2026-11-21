@@ -33,7 +33,8 @@ func Write(dir string, formats []string, r *finding.Result, stdout io.Writer, co
 		if !ok {
 			return paths, fmt.Errorf("unknown report format %q (want json, sarif, html or terminal)", f)
 		}
-		if err := os.MkdirAll(dir, 0o755); err != nil {
+		// Reports hold response data from the target: owner-only.
+		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return paths, fmt.Errorf("create report dir: %w", err)
 		}
 		p := filepath.Join(dir, spec.name)
@@ -45,8 +46,13 @@ func Write(dir string, formats []string, r *finding.Result, stdout io.Writer, co
 	return paths, nil
 }
 
+// writeFile writes an owner-only report file. An existing symlink at p is
+// refused, so a planted link cannot redirect the report elsewhere.
 func writeFile(p string, fn func(io.Writer, *finding.Result) error, r *finding.Result) (err error) {
-	out, err := os.Create(p)
+	if fi, lerr := os.Lstat(p); lerr == nil && fi.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("create %s: refusing to write through a symlink", p)
+	}
+	out, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return fmt.Errorf("create %s: %w", p, err)
 	}

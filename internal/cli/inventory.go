@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/ardayesilcayir/authdiff/internal/report"
 	"github.com/ardayesilcayir/authdiff/internal/spec"
 	"github.com/ardayesilcayir/authdiff/pkg/authdiff"
 )
@@ -64,7 +65,8 @@ func (a *app) inventoryCmd() *cobra.Command {
 			tw := tabwriter.NewWriter(a.stdout, 0, 4, 2, ' ', 0)
 			fmt.Fprintln(tw, "METHOD\tPATH\tOPERATION\tSECURED\tPARAMS")
 			for _, v := range views {
-				fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", v.Method, v.Path, dash(v.OperationID), yesNo(v.Secured), paramList(v.Params))
+				fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", clean(v.Method), clean(v.Path), clean(dash(v.OperationID)),
+					yesNo(v.Secured), clean(paramList(v.Params)))
 			}
 			return tw.Flush()
 		},
@@ -81,6 +83,9 @@ func paramList(ps []paramView) string {
 	}
 	return dash(strings.Join(parts, ","))
 }
+
+// clean strips control characters from spec-derived text printed to the terminal.
+func clean(s string) string { return report.CleanTerminal(s) }
 
 func dash(s string) string {
 	if s == "" {

@@ -39,6 +39,10 @@ func Validate(c *Config) error {
 		u, err := url.Parse(c.Target.BaseURL)
 		if err != nil || u.Host == "" {
 			add("target.baseUrl %q is not a valid absolute URL", c.Target.BaseURL)
+		} else if u.User != nil {
+			// Credentials in the URL would be sent by every probe, the
+			// anonymous one included, and mask missing-auth findings.
+			add("target.baseUrl must not contain credentials (user:password@); configure them as a profile's auth")
 		} else if !hostAllowed(u, c.Scope.AllowHosts) {
 			add("scope.allowHosts does not include the target.baseUrl host %q", u.Host)
 		}

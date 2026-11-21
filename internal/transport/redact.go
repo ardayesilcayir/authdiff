@@ -5,11 +5,17 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 )
 
 const maskPrefix = "****"
+
+// jwtRe matches JWT-shaped strings (header.payload.signature, base64url).
+// Tokens the target issues (login responses, refresh tokens) are not in the
+// config, so they are scrubbed by shape.
+var jwtRe = regexp.MustCompile(`eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]*`)
 
 // alwaysMasked headers are masked even when no secret is configured.
 var alwaysMasked = map[string]struct{}{
@@ -91,11 +97,16 @@ func newRedactor(secrets []string) *redactor {
 	return &redactor{repl: strings.NewReplacer(args...)}
 }
 
+// String replaces configured secrets, then any remaining JWT-shaped string,
+// with their masks.
 func (d *redactor) String(s string) string {
-	if d.repl == nil {
-		return s
+	if d.repl != nil {
+		s = d.repl.Replace(s)
 	}
-	return d.repl.Replace(s)
+	if strings.Contains(s, "eyJ") {
+		s = jwtRe.ReplaceAllStringFunc(s, mask)
+	}
+	return s
 }
 
 func (d *redactor) Headers(h http.Header) map[string]string {
@@ -124,6 +135,7 @@ func (d *redactor) Headers(h http.Header) map[string]string {
 // Redact replaces every occurrence of each secret in s with "****" plus its
 // last 4 characters ("****" alone for secrets shorter than 8 characters).
 // Longer secrets are replaced first, so overlapping secrets leave no fragment.
+// JWT-shaped strings are masked the same way even when not configured.
 func Redact(s string, secrets []string) string {
 	return newRedactor(secrets).String(s)
 }

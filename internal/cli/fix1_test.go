@@ -67,8 +67,7 @@ func secretProject(t *testing.T, api *miniAPI, specPath string) string {
 	t.Setenv("AD_SPEC_KEY", specKey)
 	t.Setenv("AD_BASE_KEY", baseKey)
 	editConfig(t, p,
-		"./openapi.yaml", `"`+api.URL+specPath+"?api_key=${env:AD_SPEC_KEY}&v=1"+`"`,
-		`baseUrl: "`+api.URL+`"`, `baseUrl: "http://scanner:${env:AD_BASE_KEY}@`+api.host()+`"`)
+		"./openapi.yaml", `"http://scanner:${env:AD_BASE_KEY}@`+api.host()+specPath+"?api_key=${env:AD_SPEC_KEY}&v=1"+`"`)
 	return p
 }
 

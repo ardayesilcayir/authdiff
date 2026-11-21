@@ -3,10 +3,12 @@ package config
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -112,10 +114,10 @@ type RulesCfg struct {
 
 var envRe = regexp.MustCompile(`\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}`)
 
-// expandEnv replaces ${env:NAME} with the environment value; an unset
-// variable is an error naming the variable.
-func expandEnv(data []byte) ([]byte, error) {
-	var missing []string
+// expandEnv replaces ${env:NAME} with the environment value and returns the
+// substituted values; an unset variable is an error naming the variable.
+func expandEnv(data []byte) ([]byte, []string, error) {
+	var missing, values []string
 	out := envRe.ReplaceAllFunc(data, func(m []byte) []byte {
 		name := string(envRe.FindSubmatch(m)[1])
 		v, ok := os.LookupEnv(name)
@@ -123,12 +125,57 @@ func expandEnv(data []byte) ([]byte, error) {
 			missing = append(missing, name)
 			return m
 		}
+		values = append(values, v)
 		return []byte(v)
 	})
 	if len(missing) > 0 {
-		return nil, fmt.Errorf("environment variable(s) not set: %v", missing)
+		return nil, nil, fmt.Errorf("environment variable(s) not set: %v", missing)
 	}
-	return out, nil
+	return out, values, nil
+}
+
+// maskValue is the report mask: "****" plus the last 4 characters, or
+// "****" alone for values shorter than 8 characters.
+func maskValue(s string) string {
+	r := []rune(s)
+	if len(r) < 8 {
+		return "****"
+	}
+	return "****" + string(r[len(r)-4:])
+}
+
+// scrubbedErr is an error whose message has expanded env values masked
+// (yaml decode errors quote the offending scalar, which may be a token).
+type scrubbedErr struct {
+	msg string
+	err error
+}
+
+func (e *scrubbedErr) Error() string { return e.msg }
+func (e *scrubbedErr) Unwrap() error { return e.err }
+
+// scrubErr masks every substituted env value in err's message, longest first.
+func scrubErr(err error, values []string) error {
+	if err == nil {
+		return nil
+	}
+	vs := append([]string(nil), values...)
+	sort.SliceStable(vs, func(i, j int) bool { return len(vs[i]) > len(vs[j]) })
+	msg := err.Error()
+	for _, v := range vs {
+		if v == "" {
+			continue
+		}
+		msg = strings.ReplaceAll(msg, v, maskValue(v))
+		// yaml.v3 quotes a scalar longer than 10 bytes as `first7...`.
+		if len(v) > 10 {
+			msg = strings.ReplaceAll(msg, "`"+v[:7]+"...`", "`"+maskValue(v)+"`")
+		}
+	}
+	if msg == err.Error() {
+		return err
+	}
+	return &scrubbedErr{msg: msg, err: err}
 }
 
 // Load reads path, expands ${env:X}, decodes, applies defaults and validates.
@@ -140,14 +187,24 @@ func Load(path string) (*Config, error) {
 	return Parse(data)
 }
 
-// Parse is Load without the file.
+// Parse is Load without the file. Unknown keys are errors, and error
+// messages never contain the values substituted for ${env:X}.
 func Parse(data []byte) (*Config, error) {
-	data, err := expandEnv(data)
+	data, values, err := expandEnv(data)
 	if err != nil {
 		return nil, err
 	}
+	c, err := decode(data)
+	if err != nil {
+		return nil, scrubErr(err, values)
+	}
+	return c, nil
+}
+
+func decode(data []byte) (*Config, error) {
 	var c Config
 	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
 	if err := dec.Decode(&c); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
@@ -193,7 +250,13 @@ func (c *Config) ApplyDefaults() {
 	}
 }
 
-// Secrets returns every non-empty token and password for masking.
+// minUsernameSecret is the shortest basic-auth user name masked as a
+// secret; shorter ones ("a", "bob") would garble every report.
+const minUsernameSecret = 4
+
+// Secrets returns every non-empty token and password for masking, plus for
+// basic auth the user name (when at least 4 characters) and the base64
+// "username:password" credential that appears in the Authorization header.
 func (c *Config) Secrets() []string {
 	var out []string
 	for _, name := range c.ProfileNames() {
@@ -203,6 +266,12 @@ func (c *Config) Secrets() []string {
 		}
 		if a.Password != "" {
 			out = append(out, a.Password)
+		}
+		if a.Type == "basic" && a.Username != "" {
+			if len(a.Username) >= minUsernameSecret {
+				out = append(out, a.Username)
+			}
+			out = append(out, base64.StdEncoding.EncodeToString([]byte(a.Username+":"+a.Password)))
 		}
 	}
 	return out

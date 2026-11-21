@@ -28,9 +28,11 @@ func (a *app) initCmd() *cobra.Command {
 			files := []struct {
 				name string
 				data []byte
+				perm os.FileMode
 			}{
-				{"authdiff.yaml", configTemplate},
-				{".authdiff-ignore", ignoreTemplate},
+				// The config is where tokens end up: owner-only.
+				{"authdiff.yaml", configTemplate, 0o600},
+				{".authdiff-ignore", ignoreTemplate, 0o644},
 			}
 			// Check everything first so a refusal never leaves half the files.
 			if !force {
@@ -47,7 +49,10 @@ func (a *app) initCmd() *cobra.Command {
 			}
 			for _, f := range files {
 				p := filepath.Join(dir, f.name)
-				if err := os.WriteFile(p, f.data, 0o644); err != nil { // #nosec G306 -- config templates are not secret
+				if err := os.WriteFile(p, f.data, f.perm); err != nil { // #nosec G306 -- the ignore file holds no secrets
+					return err
+				}
+				if err := os.Chmod(p, f.perm); err != nil { // --force keeps the old mode otherwise
 					return err
 				}
 				fmt.Fprintln(a.stdout, "created", p)

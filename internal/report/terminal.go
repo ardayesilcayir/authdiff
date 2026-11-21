@@ -15,6 +15,23 @@ var sevColor = map[finding.Severity]lipgloss.Color{
 	finding.Critical: "9", finding.High: "1", finding.Medium: "3", finding.Low: "4", finding.Info: "8",
 }
 
+// CleanTerminal removes C0 and C1 control characters (and DEL) from s, so
+// strings that come from a spec or a target cannot inject terminal escape
+// sequences.
+func CleanTerminal(s string) string {
+	if strings.IndexFunc(s, isControl) < 0 {
+		return s
+	}
+	return strings.Map(func(r rune) rune {
+		if isControl(r) {
+			return -1
+		}
+		return r
+	}, s)
+}
+
+func isControl(r rune) bool { return r < 0x20 || (r >= 0x7f && r <= 0x9f) }
+
 // WriteTerminal prints a findings table and a one-line summary.
 func WriteTerminal(w io.Writer, r *finding.Result, color bool) error {
 	paint := func(s string, st lipgloss.Style) string {
@@ -35,8 +52,9 @@ func WriteTerminal(w io.Writer, r *finding.Result, color bool) error {
 		rows := make([][]string, 0, len(active))
 		for _, f := range active {
 			rows = append(rows, []string{
-				strings.ToUpper(string(f.Severity)), f.RuleID, f.Method + " " + f.Path,
-				f.Attacker + "→" + f.Victim, string(f.Confidence),
+				CleanTerminal(strings.ToUpper(string(f.Severity))), CleanTerminal(f.RuleID),
+				CleanTerminal(f.Method + " " + f.Path),
+				CleanTerminal(f.Attacker) + "→" + CleanTerminal(f.Victim), CleanTerminal(string(f.Confidence)),
 			})
 		}
 		widths := make([]int, len(header))
@@ -83,7 +101,7 @@ func WriteTerminal(w io.Writer, r *finding.Result, color bool) error {
 		}
 	}
 	for _, n := range r.Notes {
-		if _, err := fmt.Fprintf(w, "\nWarning: %s\n", n); err != nil {
+		if _, err := fmt.Fprintf(w, "\nWarning: %s\n", CleanTerminal(n)); err != nil {
 			return err
 		}
 	}

@@ -55,6 +55,14 @@ follows [Semantic Versioning](https://semver.org/).
   example generation is memoised with a 10,000-node budget per endpoint;
   source lines are indexed in one pass; a spec larger than 10 MiB is an
   error instead of being silently truncated.
+- Secrets: basic-auth user names (4+ characters) and the base64
+  `username:password` credential are masked; JWT-shaped strings are scrubbed
+  from evidence; configuration errors never quote `${env:X}` values.
+- Reports are written owner-only (`0700` / `0600`) and never through a
+  symlink; `init` writes `authdiff.yaml` as `0600`.
+- Configuration keys are strict: unknown keys are errors. `target.baseUrl`
+  with credentials and rule steps with `repeat` above 10 are rejected.
+- Control characters from the spec are stripped from terminal output.
 - `--insecure` logs a warning and adds a "TLS verification disabled" note to
   the terminal, JSON and HTML reports.
 

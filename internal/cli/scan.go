@@ -92,7 +92,8 @@ func writePlan(a *app, plan []engine.PlannedRequest) error {
 	tw := tabwriter.NewWriter(a.stdout, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(tw, "RULE\tSTEP\tPROFILE\tMETHOD\tPATH\tDESTRUCTIVE")
 	for _, p := range plan {
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", p.RuleID, p.Step, p.Profile, p.Method, p.Path, yesNo(p.Destructive))
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", clean(p.RuleID), clean(p.Step), clean(p.Profile), clean(p.Method),
+			clean(p.Path), yesNo(p.Destructive))
 	}
 	if err := tw.Flush(); err != nil {
 		return err

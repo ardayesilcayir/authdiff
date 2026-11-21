@@ -179,7 +179,8 @@ func TestSecrets(t *testing.T) {
 	c := validConfig()
 	c.Profiles["bob"] = Profile{Auth: Auth{Type: "basic", Username: "bob", Password: "pw-1234"}}
 	c.Profiles["anon"] = Profile{Auth: Auth{Type: "none"}}
-	assert.ElementsMatch(t, []string{"tok", "pw-1234"}, c.Secrets())
+	assert.ElementsMatch(t, []string{"tok", "pw-1234", "Ym9iOnB3LTEyMzQ="}, c.Secrets(),
+		"a 3-letter user name is not masked; its base64 credential is")
 }
 
 func TestProfileNamesSorted(t *testing.T) {

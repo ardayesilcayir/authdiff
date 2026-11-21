@@ -112,6 +112,9 @@ var reservedNames = map[string]bool{
 	"similarity": true, "evidence": true, "matrixForbids": true, "len": true,
 }
 
+// MaxRepeat is the largest accepted step repeat count.
+const MaxRepeat = 10
+
 // Validate checks the rule, fills defaults and compiles its expressions.
 // Errors name the offending field.
 func Validate(r *Rule) error {
@@ -158,6 +161,9 @@ func Validate(r *Rule) error {
 		}
 		if !inRoles(s.Use) {
 			return fmt.Errorf("steps[%d].use: unknown role %q", i, s.Use)
+		}
+		if s.Repeat < 0 || s.Repeat > MaxRepeat {
+			return fmt.Errorf("steps[%d].repeat: must be between 0 and %d, got %d", i, MaxRepeat, s.Repeat)
 		}
 	}
 	if r.Kind == KindTemplate {

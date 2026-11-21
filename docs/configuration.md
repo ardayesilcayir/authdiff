@@ -67,8 +67,20 @@ names the variable. Never write tokens into the file itself.
 
 Every token and password from `profiles` is masked in every output (terminal,
 logs, JSON, SARIF, HTML) as `****` plus its last 4 characters (`****` only for
-values shorter than 8 characters). The `Authorization`, `Cookie`,
-`Set-Cookie` and `X-API-Key` headers are always masked the same way.
+values shorter than 8 characters). For `basic` auth the user name (when it
+has at least 4 characters) and the base64 `username:password` credential are
+masked too. JWT-shaped strings (`eyJ….….…`) in evidence are masked even when
+the target issued them. The `Authorization`, `Cookie`, `Set-Cookie` and
+`X-API-Key` headers are always masked the same way. Configuration errors
+never show a value substituted from `${env:NAME}`.
+
+Unknown keys are errors (`field allowDestructve not found`), so a typo in a
+safety setting cannot silently fall back to its default.
+
+**Reports are sensitive.** Evidence contains the target's response bodies
+(other users' data, for a real finding). Report directories are created
+owner-only (`0700`) and files `0600`; an existing symlink in place of a report
+file is refused. `authdiff init` writes `authdiff.yaml` as `0600`.
 
 ## `version`
 
@@ -78,7 +90,7 @@ Must be `1`.
 
 | Key | Required | Description |
 |---|---|---|
-| `baseUrl` | yes | Absolute URL the API is served from. A path prefix is kept: `http://h/api` + `/orders/{orderId}` becomes `http://h/api/orders/101`. |
+| `baseUrl` | yes | Absolute URL the API is served from, without credentials (`user:pass@` is rejected: it would be sent by the anonymous probe too; use a profile's `auth`). A path prefix is kept: `http://h/api` + `/orders/{orderId}` becomes `http://h/api/orders/101`. |
 | `spec` | yes | OpenAPI 3.0 or 3.1 document, YAML or JSON. A file path (relative to the config file) or an `http(s)` URL. A URL is downloaded through the same scoped transport as every other request, so it must be inside `allowHosts`. A spec larger than 10 MiB is rejected. |
 
 Use a local spec file when you upload SARIF to GitHub code scanning: SARIF

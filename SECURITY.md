@@ -45,6 +45,15 @@ example:
   or rule file,
 - TLS verification disabled without `--insecure`.
 
+## Handling reports
+
+Reports (`results.json`, `results.sarif`, `report.html`) contain request and
+response evidence from the target, including other users' data when a finding
+is real. Tokens and JWT-shaped strings are masked, but the data itself is
+not. Treat reports as sensitive: authdiff writes them owner-only, and you
+should not commit them, attach them to public issues or upload them anywhere
+public.
+
 ## Out of scope
 
 - Vulnerabilities in the **vuln-lab**: it is deliberately vulnerable. Never

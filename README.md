@@ -207,9 +207,14 @@ The safety defaults are "off" and stay that way unless you change them:
   recognize the traffic.
 - No brute force, credential guessing or denial-of-service features, by
   design.
-- Tokens are masked in logs and every report; the HTML report escapes target
-  content and ships a Content Security Policy; TLS verification is on by
-  default, and `--insecure` is logged as a warning and shown in every report.
+- Tokens are masked in logs and every report (target-issued JWTs too); the
+  HTML report escapes target content and ships a Content Security Policy;
+  spec text printed to the terminal has control characters removed.
+- Reports contain the target's response data and are sensitive: they are
+  written owner-only (`0700` directory, `0600` files) and never through a
+  symlink. Do not commit or publish them.
+- TLS verification is on by default; `--insecure` is logged as a warning and
+  shown in every report.
 - Redirects that downgrade `https` to `http` or go to a different
   `host:port` are refused, so credentials are never forwarded.
 - `HTTP_PROXY` / `HTTPS_PROXY` are ignored; a proxy is used only when set

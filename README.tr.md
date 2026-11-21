@@ -210,10 +210,15 @@ Güvenlik varsayılanları "kapalı" başlar ve siz değiştirmedikçe öyle kal
   tanıyabilir.
 - Kaba kuvvet, kimlik bilgisi tahmini veya DoS özelliği bilinçli olarak
   yoktur.
-- Token'lar log'larda ve tüm raporlarda maskelenir; HTML rapor hedeften gelen
-  içeriği escape eder ve Content Security Policy içerir; TLS doğrulaması
-  varsayılan olarak açıktır, `--insecure` uyarı olarak loglanır ve her raporda
-  gösterilir.
+- Token'lar log'larda ve tüm raporlarda maskelenir (hedefin ürettiği JWT'ler
+  dahil); HTML rapor hedeften gelen içeriği escape eder ve Content Security
+  Policy içerir; terminale basılan spec metinlerinden kontrol karakterleri
+  temizlenir.
+- Raporlar hedefin yanıt verisini içerir ve hassastır: yalnızca sahibine açık
+  (`0700` dizin, `0600` dosya) yazılır, symlink üzerinden asla yazılmaz.
+  Commit etmeyin, yayımlamayın.
+- TLS doğrulaması varsayılan olarak açıktır; `--insecure` uyarı olarak
+  loglanır ve her raporda gösterilir.
 - `https`'ten `http`'ye düşüren veya farklı bir `host:port`'a giden
   redirect'ler reddedilir; kimlik bilgileri başka yere iletilmez.
 - `HTTP_PROXY` / `HTTPS_PROXY` yok sayılır; proxy yalnızca `safety.proxy` veya

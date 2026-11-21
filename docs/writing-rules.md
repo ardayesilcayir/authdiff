@@ -95,7 +95,7 @@ way round.
 | `as` | Role that sends the request (table below). |
 | `use` | Role whose owned IDs fill the path parameters. |
 | `method` | Send this method instead of the endpoint's (for example a `GET` before a write). |
-| `repeat` | Send the request this many times. Fields that differ between repeats are marked dynamic and ignored by `similarity`. |
+| `repeat` | Send the request this many times (at most 10). Fields that differ between repeats are marked dynamic and ignored by `similarity`. |
 | `skipDestructive` | Do not send the step when its method is `DELETE`, `PUT` or `PATCH`; `name.sent` is then `false`. |
 | `body` | Top-level JSON keys merged into the request body. |
 
