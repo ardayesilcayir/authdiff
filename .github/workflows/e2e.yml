@@ -48,7 +48,7 @@ jobs:
         run: curl -sf http://localhost:8000/openapi.json -o vuln-lab/openapi.json
       - name: Build CI config
         run: |
-          sed 's#spec: http://localhost:8000/openapi.json#spec: ../vuln-lab/openapi.json#' \n            examples/authdiff.yaml > examples/authdiff.ci.yaml
+          sed 's#spec: http://localhost:8000/openapi.json#spec: ../vuln-lab/openapi.json#' examples/authdiff.yaml > examples/authdiff.ci.yaml
           grep -q 'spec: ../vuln-lab/openapi.json' examples/authdiff.ci.yaml
       # Build first: `go run` reports every non-zero exit as 1.
       - name: Build the CLI
@@ -63,8 +63,14 @@ jobs:
           echo "exit=$status" >> "$GITHUB_OUTPUT"
           # 1 = findings above failOn (expected against the lab); 2 = error.
           [ "$status" -le 1 ]
+      # The lab has known vulnerabilities: an empty SARIF means a broken scan.
+      - name: Check SARIF has findings
+        run: |
+          jq -e '.runs[0].results | length > 0' authdiff-out/results.sarif
+          grep -q AD-BOLA-001 authdiff-out/results.sarif
+      # Fork PRs get a read-only token and cannot upload to code scanning.
       - name: Upload SARIF
-        if: always() && hashFiles('authdiff-out/results.sarif') != ''
+        if: always() && hashFiles('authdiff-out/results.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true)
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: authdiff-out/results.sarif
