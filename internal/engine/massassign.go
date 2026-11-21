@@ -112,11 +112,12 @@ func injectedOwner(env *Env, self string) any {
 }
 
 // selves are the profiles that write their own objects: every
-// non-anonymous profile, by name.
+// non-anonymous, non-admin profile, by name. An admin may legitimately set
+// privileged fields, and injecting role=admin as one proves nothing.
 func selves(env *Env) []*identity.Profile {
 	var out []*identity.Profile
 	for _, p := range sortedProfiles(env.Profiles) {
-		if !p.IsAnonymous() {
+		if !p.IsAnonymous() && !p.IsAdmin() {
 			out = append(out, p)
 		}
 	}
@@ -143,6 +144,9 @@ func (c *massAssignCheck) Plan(ep spec.Endpoint, env *Env) []PlannedRequest {
 			req, err := env.Builder.Build(s.ep, s.method, p.Name, s.extra)
 			if err != nil {
 				env.logger().Warn("plan: build request", "rule", c.rule.ID, "endpoint", ep.Key(), "err", err)
+				break
+			}
+			if unownedDestructive(req) {
 				break
 			}
 			out = append(out, PlannedRequest{RuleID: c.rule.ID, Endpoint: ep.Key(), Step: s.name, Profile: p.Name,

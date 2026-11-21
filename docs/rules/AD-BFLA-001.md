@@ -27,6 +27,15 @@ For every non-admin profile (`low_priv`):
 4. **Confidence**: `high` if the admin's and the attacker's responses are
    similar (at least the threshold), otherwise `medium`.
 
+Path IDs come from the attacker's own objects. For a destructive admin
+function such as `DELETE /admin/users/{userId}` this means **the
+low-privileged profile deletes its own account** when the endpoint is
+vulnerable, so later requests as that profile may fail; restart or reseed the
+target after a destructive scan. `DELETE` endpoints run one at a time, in
+inventory order, after every other check, so the result does not depend on
+scheduling. A destructive request whose path IDs no configured profile owns
+is not sent.
+
 ## Example
 
 ```

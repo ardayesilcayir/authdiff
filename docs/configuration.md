@@ -102,10 +102,16 @@ include the `baseUrl` host.
 |---|---|---|
 | `rate` | `5` | Maximum requests per second, across all workers. CLI: `--rate`. |
 | `concurrency` | `4` | Endpoints tested in parallel. CLI: `--concurrency`. |
-| `allowDestructive` | `false` | `DELETE`, `PUT` and `PATCH` are blocked unless `true`. Blocked requests are counted in the stats. CLI: `--allow-destructive`. |
+| `allowDestructive` | `false` | `DELETE`, `PUT` and `PATCH` are blocked unless `true`. Blocked requests are counted in the stats. CLI: `--allow-destructive`. Even when `true`, a destructive request is sent only when every path ID belongs to a configured profile (`owns` or harvest); others are skipped. |
 | `timeout` | `10s` | Per-request timeout (Go duration). |
 | `maxResponseBytes` | `5242880` (5 MB) | Larger responses are truncated and marked `truncated` in evidence. |
 | `insecure` | `false` | Skip TLS certificate verification. CLI: `--insecure`. |
+
+**Safe mode still sends `POST`.** `POST` is not blocked: mass assignment
+(`AD-MASS-001`), method swap (`AD-METHOD-001`) and template rules on `POST`
+operations send real `POST` requests that **create objects** on the target,
+even without `allowDestructive`. Use a test environment you can reset, or
+exclude those operations with `filter.exclude`.
 
 Network errors and `429`/`503` responses are retried up to 3 times with
 exponential backoff.

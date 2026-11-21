@@ -21,9 +21,21 @@ check.
 For each path, every candidate method (`POST`, `PUT`, `PATCH`, `DELETE`) that
 the spec does not declare is sent with an empty JSON body (`{}`):
 
-- as another user with the owner's IDs (or as any user when there is no
-  owner / other-user pair), and
+- as another non-admin user with the owner's IDs (or, when there is no such
+  owner / other-user pair, as the first non-admin user, preferably one that
+  owns the path IDs), and
 - as the anonymous profile.
+
+Safety limits:
+
+- An `admin` profile is never used as the attacker: admins are expected to
+  be allowed, and a destructive probe as admin would really change data.
+- `PUT`, `PATCH` and `DELETE` are never swapped onto a path without path
+  parameters (a collection such as `/orders`), where they could replace or
+  wipe every object.
+- A destructive probe is not sent when a path ID does not belong to a
+  configured profile (it would be a guessed example or `1`); it is recorded
+  as skipped.
 
 A 2xx response to an undeclared method is a finding. `405 Method Not
 Allowed`, `404`, `401` and `403` are the expected answers.

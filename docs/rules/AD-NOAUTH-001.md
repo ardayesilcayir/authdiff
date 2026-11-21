@@ -17,7 +17,10 @@ any user's profile to anyone.
 ## How it works
 
 1. **Reference request**: a logged-in profile (`any_user`, preferably one that
-   owns the path IDs) calls the endpoint.
+   owns the path IDs) calls the endpoint. For destructive methods (`DELETE`,
+   `PUT`, `PATCH`) this step is skipped (`skipDestructive: true`): a logged-in
+   `DELETE` would delete the object (or, as an admin, the admin's own
+   account) and the anonymous probe would then always get `404`.
 2. **Anonymous request**: the same request without credentials.
 3. **Decision**: the anonymous request gets a 2xx **and** at least one of the
    following holds:
@@ -25,6 +28,9 @@ any user's profile to anyone.
    - the `matrix` does not allow anonymous access to it,
    - the anonymous response contains a profile's identifiers (user ID,
      e-mail).
+
+   A destructive anonymous probe is sent only when the path IDs belong to a
+   configured profile (see [configuration](../configuration.md#safety)).
 
    Endpoints that are public by design (no `security`, no matrix entry, no
    personal data in the response) are therefore not reported.

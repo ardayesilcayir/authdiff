@@ -56,7 +56,9 @@ The scan prints the findings above and writes `authdiff-out/results.json`,
 endpoint × profile heat map. The exit code is `1` because findings reached
 `failOn: high`.
 
-By default destructive methods (`DELETE`, `PUT`, `PATCH`) are blocked. To find
+By default destructive methods (`DELETE`, `PUT`, `PATCH`) are blocked.
+`POST` is **not** blocked: checks on `POST` operations (mass assignment,
+method swap) send real requests that create objects, even in safe mode. To find
 the write-side bugs as well (BOLA on `PATCH`, admin `DELETE`, mass
 assignment), allow them and restart the lab afterwards, because those checks
 change its data:
@@ -192,7 +194,10 @@ The safety defaults are "off" and stay that way unless you change them:
 - No request outside `allowHosts`, redirects included; the spec download is
   checked too.
 - 5 requests per second by default; `DELETE`, `PUT` and `PATCH` blocked
-  unless `--allow-destructive`.
+  unless `--allow-destructive`. `POST` requests are sent in safe mode and
+  create objects. Even with `--allow-destructive`, a destructive request is
+  sent only for object IDs a configured profile owns, never as an admin by
+  method swap, and `DELETE` checks run one at a time.
 - A self-identifying `User-Agent: authdiff/<version>
   (+https://github.com/ardayesilcayir/authdiff)`, so system owners can
   recognize the traffic.

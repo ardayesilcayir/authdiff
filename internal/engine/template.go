@@ -201,6 +201,9 @@ func (t *templateCheck) Plan(ep spec.Endpoint, env *Env) []PlannedRequest {
 				env.logger().Warn("plan: build request", "rule", t.rule.ID, "endpoint", ep.Key(), "err", err)
 				continue
 			}
+			if unownedDestructive(req) {
+				continue
+			}
 			n := s.Repeat
 			if n < 1 {
 				n = 1
@@ -348,6 +351,13 @@ func newFinding(r *rules.Rule, ep spec.Endpoint, method, victim, attacker string
 // failed (an errored one). The error is non-nil only when ctx is done.
 func probe(ctx context.Context, env *Env, ruleID string, p *identity.Profile, step string, req planner.Request) (*transport.Response, Observation, error) {
 	o := Observation{Endpoint: req.Method + " " + req.Endpoint.Path, Profile: p.Name, OwnIDs: req.OwnedBy(p.Name)}
+	if unownedDestructive(req) {
+		// Never change or delete an object no configured profile owns: the
+		// ID is a guess (an example or "1") and may be anybody's data.
+		env.logger().Debug("skipping destructive request with unowned path IDs", "rule", ruleID, "step", step,
+			"method", req.Method, "path", req.Path)
+		return nil, o, nil
+	}
 	resp, err := env.Sender.Send(ctx, p, step, req)
 	if err != nil {
 		// Only the caller's cancellation aborts. A per-request timeout also
@@ -367,6 +377,21 @@ func probe(ctx context.Context, env *Env, ruleID string, p *identity.Profile, st
 		o.Exchange = &ex
 	}
 	return resp, o, nil
+}
+
+// unownedDestructive reports whether req is destructive (DELETE, PUT, PATCH)
+// and fills a path parameter with a value that no configured profile owns
+// (a spec example or the "1" default).
+func unownedDestructive(req planner.Request) bool {
+	if !isDestructive(req.Method) {
+		return false
+	}
+	for _, owner := range req.IDSources {
+		if owner == "" {
+			return true
+		}
+	}
+	return false
 }
 
 // buildFailed logs a request that could not be built and returns the

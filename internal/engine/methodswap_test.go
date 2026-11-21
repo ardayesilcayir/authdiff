@@ -124,7 +124,7 @@ func TestMethodSwapOncePerPath(t *testing.T) {
 	}
 }
 
-// Without an owner of the path IDs the attacker is any_user.
+// Without an owner of the path IDs the attacker is the first non-admin user.
 func TestMethodSwapAnyUserFallback(t *testing.T) {
 	ep := spec.Endpoint{Method: "GET", Path: "/things/{thingId}", Secured: true, Params: []spec.Param{pathParam("thingId")}}
 	api := newAPI(t, func(w http.ResponseWriter, r *http.Request, _ string) {
@@ -136,7 +136,7 @@ func TestMethodSwapAnyUserFallback(t *testing.T) {
 	})
 	res := runScan(t, api, testConfig(api.URL), []spec.Endpoint{ep}, builtinRules(t, RuleMethodSwap))
 	fs := findingsOf(res, RuleMethodSwap)
-	if len(fs) != 2 || findPair(fs, "", "admin") == nil || findPair(fs, "", "anon") == nil {
-		t.Fatalf("want POST findings for any_user (admin) and anon, got %+v", fs)
+	if len(fs) != 2 || findPair(fs, "", "alice") == nil || findPair(fs, "", "anon") == nil {
+		t.Fatalf("want POST findings for the first non-admin user (alice) and anon, got %+v", fs)
 	}
 }

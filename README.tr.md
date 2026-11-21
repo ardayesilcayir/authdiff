@@ -59,6 +59,8 @@ haritası için `report.html`'i açın. Bulgular `failOn: high` eşiğine ulaşt
 için çıkış kodu `1` olur.
 
 Varsayılan olarak yıkıcı method'lar (`DELETE`, `PUT`, `PATCH`) engellenir.
+`POST` **engellenmez**: `POST` işlemlerindeki kontroller (mass assignment,
+method swap) güvenli modda da nesne oluşturan gerçek istekler gönderir.
 Yazma tarafındaki açıkları da (`PATCH` üzerinde BOLA, admin `DELETE`, mass
 assignment) bulmak için bunlara izin verin; bu kontroller lab verisini
 değiştirdiği için ardından lab'ı yeniden başlatın:
@@ -196,7 +198,10 @@ Güvenlik varsayılanları "kapalı" başlar ve siz değiştirmedikçe öyle kal
 - Redirect'ler dahil `allowHosts` dışına istek gitmez; spec indirme de
   denetlenir.
 - Varsayılan 5 istek/sn; `--allow-destructive` olmadan `DELETE`, `PUT` ve
-  `PATCH` engellenir.
+  `PATCH` engellenir. `POST` istekleri güvenli modda da gönderilir ve nesne
+  oluşturur. `--allow-destructive` ile bile yıkıcı istek yalnızca bir
+  profilin sahip olduğu nesne ID'leri için gönderilir, method swap hiçbir
+  zaman admin olarak denemez ve `DELETE` kontrolleri tek tek çalışır.
 - Kendini tanıtan `User-Agent: authdiff/<sürüm>
   (+https://github.com/ardayesilcayir/authdiff)`; sistem sahibi trafiği
   tanıyabilir.

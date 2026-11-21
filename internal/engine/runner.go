@@ -58,7 +58,8 @@ func phasesOf(eps []spec.Endpoint, checks []Check, env *Env) []int {
 }
 
 // Run executes the scan: harvest, then every phase in ascending order with
-// up to Safety.Concurrency endpoints in flight; the checks of one endpoint run
+// up to Safety.Concurrency endpoints in flight (the DELETE phase runs
+// sequentially); the checks of one endpoint run
 // sequentially on the same worker. Output is deterministic.
 func Run(ctx context.Context, o RunOptions) (*finding.Result, error) {
 	if err := o.validate(); err != nil {
@@ -127,7 +128,14 @@ func Run(ctx context.Context, o RunOptions) (*finding.Result, error) {
 	for _, phase := range phasesOf(eps, checks, env) {
 		outs := make([]Outcome, len(eps))
 		var g errgroup.Group
-		g.SetLimit(limit)
+		if phase == deletePhase {
+			// Deletes run one endpoint at a time in endpoint order, so whether
+			// an object (or the attacker's own account) still exists when a
+			// probe runs never depends on scheduling.
+			g.SetLimit(1)
+		} else {
+			g.SetLimit(limit)
+		}
 		for i, ep := range eps {
 			g.Go(func() error {
 				for _, c := range checks {

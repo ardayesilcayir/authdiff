@@ -11,6 +11,9 @@ steps:
   - name: ref
     as: any_user
     use: any_user
+    # Never send DELETE/PUT/PATCH as an authenticated user just to get a
+    # reference: it would change or delete the object the anonymous probe hits.
+    skipDestructive: true
   - name: anon
     as: anonymous
     use: any_user

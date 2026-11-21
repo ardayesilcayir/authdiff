@@ -76,29 +76,73 @@ func swapMethods(declared []string) []string {
 
 func (c *methodSwapCheck) Applies(ep spec.Endpoint, env *Env) bool {
 	declared := declaredMethods(ep, env)
-	return ep.Method == anchorMethod(declared) && len(swapMethods(declared)) > 0 && ruleApplies(c.rule.Applies, ep, env)
+	return ep.Method == anchorMethod(declared) && len(probeMethods(ep, env)) > 0 && ruleApplies(c.rule.Applies, ep, env)
 }
 
 // swapActors picks who probes: the other_user of the first owner/other_user
-// pair (by name) using the owner's IDs, else any_user with its own IDs; plus
-// the anonymous profile. victim is the owner, or nil without one.
+// pair (by name) whose other_user is not an admin, using the owner's IDs;
+// else the first non-admin user (preferring one that owns every path
+// parameter) with its own IDs; plus the anonymous profile. An admin profile
+// is never an attacker: an admin is expected to be allowed, and a destructive
+// probe as admin would really change data. victim is the owner, or nil.
 func swapActors(ep spec.Endpoint, env *Env) (victim *identity.Profile, attackers []*identity.Profile) {
-	pair := &rules.Rule{Steps: []rules.Step{{As: "owner"}, {As: "other_user"}, {As: "anonymous"}}}
-	var b binding
-	if bs := bindings(pair, ep, env); len(bs) > 0 {
-		b = bs[0]
-		victim = b["owner"]
-		attackers = append(attackers, b["other_user"])
-	} else {
-		b = bindings(&rules.Rule{Steps: []rules.Step{{As: "any_user"}, {As: "anonymous"}}}, ep, env)[0]
-		if p := b["any_user"]; p != nil {
+	pair := &rules.Rule{Steps: []rules.Step{{As: "owner"}, {As: "other_user"}}}
+	for _, b := range bindings(pair, ep, env) {
+		if a := b["other_user"]; a != nil && !a.IsAdmin() {
+			victim = b["owner"]
+			attackers = append(attackers, a)
+			break
+		}
+	}
+	if len(attackers) == 0 {
+		if p := nonAdminUser(ep, env); p != nil {
 			attackers = append(attackers, p)
 		}
 	}
-	if p := b["anonymous"]; p != nil {
-		attackers = append(attackers, p)
+	for _, p := range sortedProfiles(env.Profiles) {
+		if p.IsAnonymous() {
+			attackers = append(attackers, p)
+			break
+		}
 	}
 	return victim, attackers
+}
+
+// nonAdminUser is the first non-anonymous, non-admin profile by name that
+// owns every path parameter of ep, else the first such profile; nil when
+// there is none.
+func nonAdminUser(ep spec.Endpoint, env *Env) *identity.Profile {
+	params := ep.PathParams()
+	var first *identity.Profile
+	for _, p := range sortedProfiles(env.Profiles) {
+		if p.IsAnonymous() || p.IsAdmin() {
+			continue
+		}
+		if env.Pool.HasAll(p.Name, params) {
+			return p
+		}
+		if first == nil {
+			first = p
+		}
+	}
+	return first
+}
+
+// probeMethods are the swap methods sent on ep's path: destructive methods
+// are never sent to a path without path parameters, since a collection-level
+// PUT/PATCH/DELETE could replace or wipe every object.
+func probeMethods(ep spec.Endpoint, env *Env) []string {
+	ms := swapMethods(declaredMethods(ep, env))
+	if len(ep.PathParams()) > 0 {
+		return ms
+	}
+	out := ms[:0:0]
+	for _, m := range ms {
+		if !isDestructive(m) {
+			out = append(out, m)
+		}
+	}
+	return out
 }
 
 // swapEndpoint is ep with method m and no declared body; the probe sends "{}".
@@ -119,11 +163,14 @@ func idSourceOf(victim, attacker *identity.Profile) string {
 func (c *methodSwapCheck) Plan(ep spec.Endpoint, env *Env) []PlannedRequest {
 	victim, attackers := swapActors(ep, env)
 	var out []PlannedRequest
-	for _, m := range swapMethods(declaredMethods(ep, env)) {
+	for _, m := range probeMethods(ep, env) {
 		for _, a := range attackers {
 			req, err := env.Builder.Build(swapEndpoint(ep, m), m, idSourceOf(victim, a), nil)
 			if err != nil {
 				env.logger().Warn("plan: build request", "rule", c.rule.ID, "endpoint", ep.Key(), "err", err)
+				continue
+			}
+			if unownedDestructive(req) {
 				continue
 			}
 			out = append(out, PlannedRequest{RuleID: c.rule.ID, Endpoint: ep.Key(), Step: "swap", Profile: a.Name,
@@ -140,7 +187,7 @@ func (c *methodSwapCheck) Run(ctx context.Context, ep spec.Endpoint, env *Env) (
 	if victim != nil {
 		victimName = victim.Name
 	}
-	for _, m := range swapMethods(declaredMethods(ep, env)) {
+	for _, m := range probeMethods(ep, env) {
 		se := swapEndpoint(ep, m)
 		for _, a := range attackers {
 			req, err := env.Builder.Build(se, m, idSourceOf(victim, a), nil)

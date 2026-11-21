@@ -35,3 +35,11 @@ follows [Semantic Versioning](https://semver.org/).
   a distroless Docker image `ghcr.io/ardayesilcayir/authdiff`.
 - Documentation: README (English and Turkish), configuration reference, rule
   writing guide, rule reference, architecture and ADRs.
+
+### Safety
+
+- Destructive probes: the AD-NOAUTH-001 reference step never sends
+  `DELETE`/`PUT`/`PATCH`; a destructive request whose path IDs no configured
+  profile owns is skipped; method swap never probes as an admin and never
+  sends destructive methods to collection paths; the `DELETE` phase runs
+  sequentially; mass assignment no longer tests admin profiles.

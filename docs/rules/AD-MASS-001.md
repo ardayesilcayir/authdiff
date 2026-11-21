@@ -17,7 +17,8 @@ an administrator.
 
 ## How it works
 
-For every non-anonymous profile, writing its own object:
+For every non-anonymous, non-admin profile, writing its own object (an admin
+may legitimately set privileged fields, so admins are not tested):
 
 1. **Before**: `GET` on the same path records the current values.
 2. **Injected write**: the normal request body plus the server-controlled

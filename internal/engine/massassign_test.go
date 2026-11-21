@@ -210,8 +210,8 @@ func TestMassAssignAppliesAndPlan(t *testing.T) {
 		t.Error("non-JSON body must not apply")
 	}
 	plan := c.Plan(epPatchMe, env)
-	// 3 non-anonymous profiles x (before, inject, after)
-	if len(plan) != 9 || plan[1].Method != "PATCH" || !plan[1].Destructive || plan[0].Method != "GET" {
+	// 2 non-anonymous, non-admin profiles x (before, inject, after)
+	if len(plan) != 6 || plan[1].Method != "PATCH" || !plan[1].Destructive || plan[0].Method != "GET" {
 		t.Errorf("plan = %+v", plan)
 	}
 }

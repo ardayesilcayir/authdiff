@@ -99,6 +99,9 @@ func isDestructive(method string) bool {
 	return false
 }
 
+// deletePhase is the phase of DELETE endpoints; it runs sequentially.
+const deletePhase = 4
+
 // methodPhase is the phase an endpoint with this method runs in: reads and
 // creates first, then updates, then deletes (3 is reserved for method swaps).
 func methodPhase(method string) int {
@@ -106,7 +109,7 @@ func methodPhase(method string) int {
 	case http.MethodPut, http.MethodPatch:
 		return 2
 	case http.MethodDelete:
-		return 4
+		return deletePhase
 	}
 	return 1
 }
