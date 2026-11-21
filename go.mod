@@ -1,6 +1,6 @@
 module github.com/ardayesilcayir/authdiff
 
-go 1.23.0
+go 1.26.0
 
 require (
 	github.com/charmbracelet/lipgloss v1.1.0
@@ -9,7 +9,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1
 	github.com/tidwall/gjson v1.20.5
-	golang.org/x/sync v0.12.0
+	golang.org/x/sync v0.25.0
 	golang.org/x/time v0.11.0
 	gopkg.in/yaml.v3 v3.0.1
 )
