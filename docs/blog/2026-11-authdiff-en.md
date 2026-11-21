@@ -337,7 +337,8 @@ tool.
 The test under `test/e2e` scans the lab, compares every `(rule, method, path)`
 tuple with the oracle, and a single finding on a negative endpoint fails the
 test. With destructive checks enabled the result is **recall 1.00 (8/8) and a
-false positive rate of 0.00**. The E2E workflow also asserts that the SARIF
+false positive rate of 0.00**. The test runs in the E2E workflow in CI, and
+the CI, E2E and CodeQL workflows are green on `main`. The E2E workflow also asserts that the SARIF
 output contains findings (an empty SARIF means a broken scan) and uploads it
 to GitHub code scanning, where findings appear under **Security → Code
 scanning**.

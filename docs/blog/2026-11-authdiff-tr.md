@@ -336,7 +336,8 @@ public ürünler, `/me`, `/admin/stats` gibi. Negatifler en az pozitifler kadar
 `test/e2e` altındaki test lab'i tarıyor, her `(rule, method, path)` üçlüsünü
 oracle ile karşılaştırıyor ve negatif bir endpoint'te tek bir bulgu bile testi
 düşürüyor. Yıkıcı kontrollerle birlikte sonuç: **recall 1.00 (8/8), yanlış
-pozitif oranı 0.00**. E2E workflow'u ayrıca SARIF çıktısında bulgu olduğunu
+pozitif oranı 0.00**. Bu test `main`'e her push'ta ve her pull request'te CI'daki E2E workflow'unda koşuyor
+ve `main` üzerinde CI, E2E ve CodeQL workflow'ları yeşil. E2E workflow'u ayrıca SARIF çıktısında bulgu olduğunu
 doğruluyor (boş bir SARIF bozuk bir tarama demek) ve onu GitHub code
 scanning'e yüklüyor; bulgular **Security → Code scanning** altında görünüyor.
 
