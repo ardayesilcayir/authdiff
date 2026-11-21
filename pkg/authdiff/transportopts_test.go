@@ -38,7 +38,7 @@ func TestProxyConfigAndOverride(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Safety.Proxy != "http://user:pw-secret@proxy.example:3128" {
+	if cfg.Safety.Proxy != "http://user:pw-secret@proxy.example:3128" { //nolint:gosec // G101: test fixture, not a real credential
 		t.Errorf("proxy = %q", cfg.Safety.Proxy)
 	}
 	var logs bytes.Buffer

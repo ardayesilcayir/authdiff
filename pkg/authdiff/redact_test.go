@@ -28,7 +28,7 @@ func TestRedactURL(t *testing.T) {
 }
 
 func TestURLSecrets(t *testing.T) {
-	cfg := &config.Config{Target: config.Target{
+	cfg := &config.Config{Target: config.Target{ //nolint:gosec // G101: test fixture, not a real credential
 		BaseURL: "http://scanner:longpassword@h",
 		Spec:    "https://tokenonly@h/s.json?api_key=abcdefgh123&v=1",
 	}}

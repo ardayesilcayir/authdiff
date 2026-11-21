@@ -120,12 +120,12 @@ output: { formats: [json], dir: "%s" }
 // cfgSpecURL points target.spec of the config at p to specURL.
 func cfgSpecURL(t *testing.T, p, specURL string) {
 	t.Helper()
-	data, err := os.ReadFile(p)
+	data, err := os.ReadFile(p) //nolint:gosec // G304: operator-supplied or test-only path
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := strings.Replace(string(data), "./openapi.yaml", `"`+specURL+`"`, 1)
-	if err := os.WriteFile(p, []byte(s), 0o600); err != nil {
+	if err := os.WriteFile(p, []byte(s), 0o600); err != nil { //nolint:gosec // G703: test-only path under t.TempDir or operator-supplied input
 		t.Fatal(err)
 	}
 }

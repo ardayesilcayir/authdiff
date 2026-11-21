@@ -68,9 +68,9 @@ func TestLoadConfigValidatesOverrides(t *testing.T) {
 func TestLoadConfigKeepsSpecURL(t *testing.T) {
 	api := newMiniAPI(t)
 	p := writeProject(t, api, "")
-	data, _ := os.ReadFile(p)
+	data, _ := os.ReadFile(p) //nolint:gosec // G304: test-only path under t.TempDir or operator-supplied input
 	data = []byte(strings.Replace(string(data), "./openapi.yaml", api.URL+"/openapi.yaml", 1))
-	if err := os.WriteFile(p, data, 0o600); err != nil {
+	if err := os.WriteFile(p, data, 0o600); err != nil { //nolint:gosec // G703: test-only path under t.TempDir or operator-supplied input
 		t.Fatal(err)
 	}
 	cfg, err := LoadConfig(p, Overrides{})
