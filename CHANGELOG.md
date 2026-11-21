@@ -6,6 +6,10 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-21
+
+First stable release.
+
 ### Added
 
 - `authdiff` CLI with `init`, `inventory`, `scan` (including `--dry-run`),
@@ -92,3 +96,6 @@ follows [Semantic Versioning](https://semver.org/).
 - `examples/workflow.yml` skips pull requests from forks.
 - README: Docker usage with `--user`, `--network host` and
   `host.docker.internal`.
+
+[Unreleased]: https://github.com/ardayesilcayir/authdiff/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/ardayesilcayir/authdiff/releases/tag/v1.0.0
