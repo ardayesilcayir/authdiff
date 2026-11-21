@@ -1,0 +1,72 @@
+# authdiff config for VAmPI, the deliberately vulnerable Flask API
+# (https://github.com/erev0s/VAmPI). Results: docs/benchmarks.md.
+#
+#   docker run -d --name vampi -p 127.0.0.1:5000:5000 erev0s/vampi:latest
+#   . examples/vampi-setup.sh        # reset DB, add books, export VAMPI_*_TOKEN
+#   authdiff scan -c examples/vampi.yaml
+#
+# Bind VAmPI to 127.0.0.1 only: it is vulnerable on purpose.
+version: 1
+target:
+  baseUrl: http://localhost:5000
+  spec: ./vampi-openapi.yml          # VAmPI's own spec (MIT), see its header
+
+scope:
+  allowHosts: ["localhost:5000"]
+  # You run VAmPI yourself, so you are authorized to test it.
+  acknowledgeAuthorization: true
+
+safety:
+  rate: 10
+  concurrency: 2
+  # Destructive scans change VAmPI's data (passwords, e-mails, users):
+  # run examples/vampi-setup.sh again afterwards.
+  allowDestructive: false
+  timeout: 10s
+
+# Tokens come from examples/vampi-setup.sh; never write them into this file.
+# VAmPI identifies users and books by name, so the "IDs" are strings.
+profiles:
+  admin:
+    role: admin
+    auth: { type: bearer, token: "${env:VAMPI_ADMIN_TOKEN}" }
+    owns: { username: [admin], book_title: [admin-book] }
+    identifiers: [admin@mail.com]
+  name1:
+    role: user
+    auth: { type: bearer, token: "${env:VAMPI_NAME1_TOKEN}" }
+    owns: { username: [name1], book_title: [name1-book] }
+    identifiers: [mail1@mail.com, secret of name1-book]
+  name2:
+    role: user
+    auth: { type: bearer, token: "${env:VAMPI_NAME2_TOKEN}" }
+    owns: { username: [name2], book_title: [name2-book] }
+    identifiers: [mail2@mail.com, secret of name2-book]
+  anonymous:
+    role: none
+    auth: { type: none }
+
+# The intended policy, as VAmPI's README describes it. Without a matrix
+# authdiff still finds the BOLA and missing-authentication bugs; the matrix
+# adds the write-only endpoints (no GET to compare against) and marks the
+# debug endpoint as an admin function.
+matrix:
+  # "An unregistered user can see minimal information about the dummy users."
+  "GET /users/v1":                     { allow: [anonymous, user, admin] }
+  "GET /users/v1/{username}":          { allow: [anonymous, user, admin] }
+  "GET /users/v1/_debug":             { allow: [admin] }   # "all details for all users"
+  "DELETE /users/v1/{username}":       { allow: [admin] }   # "Only Admins"
+  "PUT /users/v1/{username}/password": { allow: [owner] }
+  "PUT /users/v1/{username}/email":    { allow: [owner] }
+  "GET /books/v1/{book_title}":        { allow: [owner] }   # "only the owner ... should view the secret"
+
+filter:
+  exclude:
+    # GET /createdb drops and re-seeds the whole database (new random book
+    # titles): scanning it would invalidate every `owns` entry mid-scan.
+    - "GET /createdb"
+
+output:
+  formats: [terminal, json, html]
+  dir: ./authdiff-out
+  failOn: high

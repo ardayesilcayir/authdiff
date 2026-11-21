@@ -10,6 +10,8 @@ follows [Semantic Versioning](https://semver.org/).
 
 - `matrixAllows("step")` rule expression helper: true when a matrix entry
   for the endpoint explicitly allows the step's profile.
+- Second-target validation against VAmPI: `docs/benchmarks.md`,
+  `examples/vampi.yaml`, `examples/vampi-setup.sh`.
 
 ### Fixed
 
