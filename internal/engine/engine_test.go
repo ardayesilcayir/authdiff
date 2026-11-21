@@ -308,6 +308,28 @@ func TestNOAUTHMatrixForbids(t *testing.T) {
 	}
 }
 
+// An explicit matrix entry that allows anonymous access declares the
+// endpoint public: identifiers in the anonymous response are then intended
+// (a public user directory) and must not be reported as missing auth.
+func TestNOAUTHMatrixAllowsAnonymous(t *testing.T) {
+	api := newAPI(t, func(w http.ResponseWriter, _ *http.Request, _ string) {
+		writeJSON(w, http.StatusOK, map[string]any{"name": "Alice", "email": "alice@example.com"})
+	})
+	cfg := testConfig(api.URL)
+	cfg.Matrix = map[string]config.MatrixRule{"GET /users/me/profile": {Allow: []string{"anon", "user", "admin"}}}
+	res := runScan(t, api, cfg, []spec.Endpoint{epProfile}, templateRules(t, RuleNOAUTH))
+	if fs := findingsOf(res, RuleNOAUTH); len(fs) != 0 {
+		t.Fatalf("matrix allows anonymous: want no NOAUTH finding, got %+v", fs)
+	}
+
+	// A matrix entry for another endpoint changes nothing.
+	cfg.Matrix = map[string]config.MatrixRule{"GET /orders/**": {Allow: []string{"anon"}}}
+	res = runScan(t, api, cfg, []spec.Endpoint{epProfile}, templateRules(t, RuleNOAUTH))
+	if fs := findingsOf(res, RuleNOAUTH); len(fs) != 1 {
+		t.Fatalf("unrelated matrix entry: want 1 NOAUTH finding, got %+v", res.Findings)
+	}
+}
+
 func TestPhaseOrdering(t *testing.T) {
 	api := newAPI(t, func(w http.ResponseWriter, _ *http.Request, _ string) {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})

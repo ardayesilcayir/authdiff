@@ -156,6 +156,27 @@ func TestEvalBOLA(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestEvalNoAuthMatrixAllows(t *testing.T) {
+	r := builtin(t, "AD-NOAUTH-001")
+	fn := Funcs{
+		Evidence:     func(string, []string) bool { return true },
+		MatrixAllows: func(s string) bool { return s == "anon" },
+	}
+	env := NewEnv(map[string]StepEnv{"ref": step(200, "x"), "anon": step(200, "x")},
+		EndpointEnv{Secured: true}, 0.85, []string{"alice@example.com"}, fn)
+	ok, _, err := r.Eval(env)
+	require.NoError(t, err)
+	assert.False(t, ok, "matrix allows anonymous: no finding")
+
+	fn.MatrixAllows = nil // default: no matrix entry
+	env = NewEnv(map[string]StepEnv{"ref": step(200, "x"), "anon": step(200, "x")},
+		EndpointEnv{Secured: true}, 0.85, []string{"alice@example.com"}, fn)
+	ok, conf, err := r.Eval(env)
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, finding.ConfHigh, conf)
+}
+
 func TestEvalNoAuthAndBFLA(t *testing.T) {
 	fn := Funcs{
 		Similarity:    func(_, _ string) float64 { return 0 },

@@ -298,6 +298,7 @@ func (t *templateCheck) runBinding(ctx context.Context, ep spec.Endpoint, env *E
 			return ok
 		},
 		MatrixForbids: func(step string) bool { return matrixForbids(env, ep, results[step]) },
+		MatrixAllows:  func(step string) bool { return matrixAllowsStep(env, ep, results[step]) },
 	})
 	matched, conf, err := r.Eval(vm)
 	if err != nil {
@@ -456,4 +457,19 @@ func matrixForbids(env *Env, ep spec.Endpoint, sr *stepResult) bool {
 	}
 	p := sr.profile
 	return !matrixAllows(allow, p.Name, p.Role, sr.built && sr.req.OwnedBy(p.Name))
+}
+
+// matrixAllowsStep reports whether a configured matrix entry matches the
+// endpoint and explicitly allows the step's profile. Without a matching entry
+// it is false, like matrixForbids: the matrix says nothing about the endpoint.
+func matrixAllowsStep(env *Env, ep spec.Endpoint, sr *stepResult) bool {
+	if sr == nil || sr.profile == nil {
+		return false
+	}
+	allow, ok := env.matrixAllow(ep)
+	if !ok {
+		return false
+	}
+	p := sr.profile
+	return matrixAllows(allow, p.Name, p.Role, sr.built && sr.req.OwnedBy(p.Name))
 }

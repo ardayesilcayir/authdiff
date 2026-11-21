@@ -6,6 +6,18 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `matrixAllows("step")` rule expression helper: true when a matrix entry
+  for the endpoint explicitly allows the step's profile.
+
+### Fixed
+
+- AD-NOAUTH-001 reported endpoints whose `matrix` entry explicitly allows
+  `anonymous` when the response contained a profile identifier (a public
+  user directory), although the matrix docs say an updated matrix is the
+  way to accept intended access.
+
 ## [1.0.0] - 2026-11-21
 
 First stable release.

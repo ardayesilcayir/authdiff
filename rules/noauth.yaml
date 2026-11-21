@@ -19,9 +19,11 @@ steps:
     use: any_user
 victim: ref
 attacker: anon
+# An explicit matrix entry that allows anonymous access declares the endpoint
+# public, so identifiers in its response are intended (a public directory).
 match: >
-  anon.ok && (endpoint.secured || matrixForbids("anon") ||
-  evidence(anon.body, identifiers))
+  anon.ok && !matrixAllows("anon") &&
+  (endpoint.secured || matrixForbids("anon") || evidence(anon.body, identifiers))
 confidence:
   high: evidence(anon.body, identifiers)
   medium: "true"

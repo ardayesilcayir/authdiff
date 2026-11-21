@@ -35,6 +35,7 @@ type Funcs struct {
 	Similarity    func(a, b string) float64
 	Evidence      func(body string, ids []string) bool
 	MatrixForbids func(step string) bool
+	MatrixAllows  func(step string) bool
 }
 
 // withDefaults fills nil helpers with inert implementations.
@@ -53,6 +54,9 @@ func (f Funcs) withDefaults() Funcs {
 	if f.MatrixForbids == nil {
 		f.MatrixForbids = func(string) bool { return false }
 	}
+	if f.MatrixAllows == nil {
+		f.MatrixAllows = func(string) bool { return false }
+	}
 	return f
 }
 
@@ -60,7 +64,7 @@ func (f Funcs) withDefaults() Funcs {
 // The builtin len() is provided by expr itself and is not added to the map.
 func NewEnv(steps map[string]StepEnv, ep EndpointEnv, threshold float64, identifiers []string, fn Funcs) map[string]any {
 	fn = fn.withDefaults()
-	env := make(map[string]any, len(steps)+6)
+	env := make(map[string]any, len(steps)+7)
 	for name, s := range steps {
 		env[name] = s
 	}
@@ -76,6 +80,7 @@ func NewEnv(steps map[string]StepEnv, ep EndpointEnv, threshold float64, identif
 	env["similarity"] = fn.Similarity
 	env["evidence"] = fn.Evidence
 	env["matrixForbids"] = fn.MatrixForbids
+	env["matrixAllows"] = fn.MatrixAllows
 	return env
 }
 

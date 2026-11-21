@@ -109,7 +109,7 @@ func inRoles(s string) bool {
 
 var reservedNames = map[string]bool{
 	"endpoint": true, "cfg": true, "identifiers": true,
-	"similarity": true, "evidence": true, "matrixForbids": true, "len": true,
+	"similarity": true, "evidence": true, "matrixForbids": true, "matrixAllows": true, "len": true,
 }
 
 // MaxRepeat is the largest accepted step repeat count.

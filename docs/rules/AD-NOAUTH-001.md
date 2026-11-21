@@ -22,8 +22,9 @@ any user's profile to anyone.
    `DELETE` would delete the object (or, as an admin, the admin's own
    account) and the anonymous probe would then always get `404`.
 2. **Anonymous request**: the same request without credentials.
-3. **Decision**: the anonymous request gets a 2xx **and** at least one of the
-   following holds:
+3. **Decision**: the anonymous request gets a 2xx, the `matrix` does not
+   explicitly allow anonymous access to the endpoint, **and** at least one of
+   the following holds:
    - the operation declares `security` in the OpenAPI spec (a requirement
      list that contains an empty object, such as `[{bearer: []}, {}]`, means
      authentication is optional and does not count),
@@ -35,7 +36,9 @@ any user's profile to anyone.
    configured profile (see [configuration](../configuration.md#safety)).
 
    Endpoints that are public by design (no `security`, no matrix entry, no
-   personal data in the response) are therefore not reported.
+   personal data in the response) are therefore not reported. A public
+   endpoint that does return personal data, such as a user directory, is
+   declared with a matrix entry that lists `anonymous`.
 4. **Confidence**: `high` when identifiers appear in the anonymous response,
    otherwise `medium`.
 

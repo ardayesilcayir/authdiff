@@ -36,8 +36,10 @@ observed during the scan is compared with the matrix:
   not reported again.
 
 The matrix also feeds other rules: an entry that allows only `admin` marks
-the endpoint as an admin function (AD-BFLA-001), and an entry that does not
-allow anonymous access makes AD-NOAUTH-001 report anonymous 2xx responses.
+the endpoint as an admin function (AD-BFLA-001), an entry that does not
+allow anonymous access makes AD-NOAUTH-001 report anonymous 2xx responses,
+and an entry that allows anonymous access keeps AD-NOAUTH-001 silent for that
+endpoint.
 
 ## How to fix
 

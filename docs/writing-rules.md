@@ -91,7 +91,7 @@ way round.
 
 | Key | Description |
 |---|---|
-| `name` | Lowercase identifier (`^[a-z_][a-z0-9_]*$`), used in expressions. Must be unique and not one of `endpoint`, `cfg`, `identifiers`, `similarity`, `evidence`, `matrixForbids`, `len`. |
+| `name` | Lowercase identifier (`^[a-z_][a-z0-9_]*$`), used in expressions. Must be unique and not one of `endpoint`, `cfg`, `identifiers`, `similarity`, `evidence`, `matrixForbids`, `matrixAllows`, `len`. |
 | `as` | Role that sends the request (table below). |
 | `use` | Role whose owned IDs fill the path parameters. |
 | `method` | Send this method instead of the endpoint's (for example a `GET` before a write). |
@@ -149,6 +149,7 @@ Other names:
 | `similarity(a, b)` | structural JSON similarity in [0, 1], with `ignoreFields` and dynamic fields removed; non-JSON bodies are compared by hash and length |
 | `evidence(body, ids)` | `body` contains one of `ids`. In JSON, a value shorter than 6 characters (such as user ID `2`) only counts in a field whose name contains owner, user, email, account or customer; in other bodies only values of 6+ characters are searched |
 | `matrixForbids("step")` | the config's `matrix` does not allow that step's profile |
+| `matrixAllows("step")` | the config's `matrix` has an entry for the endpoint that allows that step's profile. Both are `false` when no matrix entry matches the endpoint |
 
 ## Example: tenant isolation
 
