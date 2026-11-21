@@ -1,0 +1,9 @@
+# authdiff ignore file (baseline of acknowledged findings).
+#
+# One finding ID per line: the 12 hex characters shown as "id" in
+# results.json, as authdiffFindingId in results.sarif and in report.html.
+# Anything after "#" is a comment; blank lines are ignored. Example:
+#
+#   3f9a1c0b7d2e  # AD-BOLA-001 GET /orders/{orderId} alice -> bob, accepted risk
+#
+# Suppressed findings are marked as such and no longer count toward --fail-on.

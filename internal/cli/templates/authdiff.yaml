@@ -1,0 +1,54 @@
+version: 1
+target:
+  baseUrl: http://localhost:8000
+  spec: ./openapi.json          # file path (relative to this file) or URL
+
+scope:                          # required: no request ever leaves this list
+  allowHosts: ["localhost:8000"]
+  # Set to true only after confirming you are authorized to test this system.
+  acknowledgeAuthorization: false
+
+safety:
+  rate: 5                       # requests per second
+  concurrency: 4
+  allowDestructive: false       # DELETE/PUT/PATCH are blocked unless true
+  timeout: 10s
+
+# Tokens are read from the environment; never write secrets into this file.
+profiles:
+  admin:
+    role: admin
+    auth: { type: bearer, token: "${env:ADMIN_TOKEN}" }
+  alice:
+    role: user
+    auth: { type: bearer, token: "${env:ALICE_TOKEN}" }
+    owns: { userId: [2], orderId: [101, 102], invoiceId: [9001] }
+  bob:
+    role: user
+    auth: { type: bearer, token: "${env:BOB_TOKEN}" }
+    owns: { userId: [3], orderId: [201] }
+  anonymous:
+    role: none
+    auth: { type: none }
+
+harvest:                        # collect IDs from each profile's own responses
+  - endpoint: GET /me/orders
+    extract: { orderId: "$.items[*].id" }
+
+matrix:                         # expected authorization matrix
+  "GET /admin/**":   { allow: [admin] }
+  "GET /orders/{orderId}": { allow: [admin, owner] }
+  "POST /orders":    { allow: [admin, user] }
+
+compare:
+  ignoreFields: ["$.requestId", "$..updatedAt"]
+  similarityThreshold: 0.85
+
+output:
+  formats: [terminal, json, sarif, html]
+  dir: ./authdiff-out
+  failOn: high
+
+# rules:
+#   dirs: [./rules]             # custom rule templates (relative to this file)
+#   disable: [AD-LEAK-001]      # built-in or custom rule IDs to skip
