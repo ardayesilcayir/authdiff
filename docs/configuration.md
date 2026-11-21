@@ -79,7 +79,7 @@ Must be `1`.
 | Key | Required | Description |
 |---|---|---|
 | `baseUrl` | yes | Absolute URL the API is served from. A path prefix is kept: `http://h/api` + `/orders/{orderId}` becomes `http://h/api/orders/101`. |
-| `spec` | yes | OpenAPI 3.0 or 3.1 document, YAML or JSON. A file path (relative to the config file) or an `http(s)` URL. A URL is downloaded through the same scoped transport as every other request, so it must be inside `allowHosts`. |
+| `spec` | yes | OpenAPI 3.0 or 3.1 document, YAML or JSON. A file path (relative to the config file) or an `http(s)` URL. A URL is downloaded through the same scoped transport as every other request, so it must be inside `allowHosts`. A spec larger than 10 MiB is rejected. |
 
 Use a local spec file when you upload SARIF to GitHub code scanning: SARIF
 locations point at the spec file, and code scanning needs a file in the
@@ -104,7 +104,7 @@ include the `baseUrl` host.
 | `concurrency` | `4` | Endpoints tested in parallel. CLI: `--concurrency`. |
 | `allowDestructive` | `false` | `DELETE`, `PUT` and `PATCH` are blocked unless `true`. Blocked requests are counted in the stats. CLI: `--allow-destructive`. Even when `true`, a destructive request is sent only when every path ID belongs to a configured profile (`owns` or harvest); others are skipped. |
 | `timeout` | `10s` | Per-attempt request timeout (Go duration). Time spent waiting for the rate limiter is not counted. |
-| `maxResponseBytes` | `5242880` (5 MB) | Larger responses are truncated and marked `truncated` in evidence. |
+| `maxResponseBytes` | `5242880` (5 MB) | Larger responses are truncated and marked `truncated` in evidence. At most `52428800` (50 MiB). JSON comparison looks at no more than 50,000 leaves per response and truncates object keys longer than 256 characters. |
 | `insecure` | `false` | Skip TLS certificate verification. Logged as a warning and shown in every report. CLI: `--insecure`. |
 | `proxy` | none | Explicit proxy URL (`http`, `https` or `socks5`) for every request. `HTTP_PROXY` / `HTTPS_PROXY` are ignored. The proxy sees all traffic, credentials included, and is not checked against `allowHosts`; its use is logged at start. CLI: `--proxy`. |
 

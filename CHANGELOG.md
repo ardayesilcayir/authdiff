@@ -49,6 +49,12 @@ follows [Semantic Versioning](https://semver.org/).
   with the new `safety.proxy` key or `--proxy` flag, and is logged.
 - Network errors are retried only for `GET`/`HEAD`/`OPTIONS`; `429`/`503`
   are still retried for any method.
+- Resource limits against hostile targets and specs: JSON flattening keeps
+  at most 50,000 leaves (marked `<leaf-limit>`) and truncates keys longer
+  than 256 characters; `safety.maxResponseBytes` is capped at 50 MiB; spec
+  example generation is memoised with a 10,000-node budget per endpoint;
+  source lines are indexed in one pass; a spec larger than 10 MiB is an
+  error instead of being silently truncated.
 - `--insecure` logs a warning and adds a "TLS verification disabled" note to
   the terminal, JSON and HTML reports.
 

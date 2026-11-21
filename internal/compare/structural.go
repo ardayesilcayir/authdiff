@@ -7,8 +7,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // maxDepth is the deepest container nesting that Flatten descends into.
@@ -16,6 +18,19 @@ import (
 const maxDepth = 64
 
 const depthLimitLeaf = "<depth-limit>"
+
+// maxLeaves caps the leaves Flatten collects; the rest of a larger document
+// is dropped and a single leafLimitLeaf marks the cut.
+const maxLeaves = 50000
+
+// maxPathBytes caps the total size of all collected paths, so many leaves
+// under long or deep keys cannot exhaust memory either.
+const maxPathBytes = 32 * 1024 * 1024
+
+// maxKeyLen is the longest object key kept in a path; longer keys are cut.
+const maxKeyLen = 256
+
+const leafLimitLeaf = "<leaf-limit>"
 
 // leaf is one scalar (or empty container) found while flattening JSON.
 type leaf struct {
@@ -47,49 +62,91 @@ func flattenLeaves(body []byte) (map[string]leaf, bool) {
 	if !ok {
 		return nil, false
 	}
-	out := make(map[string]leaf)
-	walk(v, "$", 0, out)
-	return out, true
+	w := &walker{out: make(map[string]leaf)}
+	w.walk(v, "$", 0)
+	return w.out, true
+}
+
+// walker collects leaves up to maxLeaves / maxPathBytes; object keys are
+// visited in sorted order so a cut keeps the same leaves every time.
+type walker struct {
+	out   map[string]leaf
+	bytes int
+	full  bool
+}
+
+// add records one leaf, or the leaf-limit marker once a cap is reached.
+func (w *walker) add(path string, l leaf) {
+	if w.full {
+		return
+	}
+	if len(w.out) >= maxLeaves || w.bytes+len(path) > maxPathBytes {
+		w.full = true
+		w.out[path] = leaf{canon: leafLimitLeaf, raw: leafLimitLeaf}
+		return
+	}
+	w.bytes += len(path)
+	w.out[path] = l
 }
 
 // walk recurses at most maxDepth levels, so the stack stays bounded no matter
 // how deep the input is.
-func walk(v any, path string, depth int, out map[string]leaf) {
+func (w *walker) walk(v any, path string, depth int) {
+	if w.full {
+		return
+	}
 	switch t := v.(type) {
 	case map[string]any:
 		if len(t) == 0 {
-			out[path] = leaf{canon: "{}", raw: "{}"}
+			w.add(path, leaf{canon: "{}", raw: "{}"})
 			return
 		}
 		if depth >= maxDepth {
-			out[path] = leaf{canon: depthLimitLeaf, raw: depthLimitLeaf}
+			w.add(path, leaf{canon: depthLimitLeaf, raw: depthLimitLeaf})
 			return
 		}
-		for k, c := range t {
-			walk(c, path+"."+k, depth+1, out)
+		keys := make([]string, 0, len(t))
+		for k := range t {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			w.walk(t[k], path+"."+truncKey(k), depth+1)
 		}
 	case []any:
 		if len(t) == 0 {
-			out[path] = leaf{canon: "[]", raw: "[]"}
+			w.add(path, leaf{canon: "[]", raw: "[]"})
 			return
 		}
 		if depth >= maxDepth {
-			out[path] = leaf{canon: depthLimitLeaf, raw: depthLimitLeaf}
+			w.add(path, leaf{canon: depthLimitLeaf, raw: depthLimitLeaf})
 			return
 		}
 		for i, c := range t {
-			walk(c, path+"["+strconv.Itoa(i)+"]", depth+1, out)
+			w.walk(c, path+"["+strconv.Itoa(i)+"]", depth+1)
 		}
 	case string:
-		out[path] = leaf{canon: quote(t), raw: t}
+		w.add(path, leaf{canon: quote(t), raw: t})
 	case json.Number:
-		out[path] = leaf{canon: t.String(), raw: t.String()}
+		w.add(path, leaf{canon: t.String(), raw: t.String()})
 	case bool:
 		s := strconv.FormatBool(t)
-		out[path] = leaf{canon: s, raw: s}
+		w.add(path, leaf{canon: s, raw: s})
 	default: // nil
-		out[path] = leaf{canon: "null", raw: "null"}
+		w.add(path, leaf{canon: "null", raw: "null"})
 	}
+}
+
+// truncKey cuts a key to maxKeyLen bytes without splitting a UTF-8 rune.
+func truncKey(k string) string {
+	if len(k) <= maxKeyLen {
+		return k
+	}
+	cut := maxKeyLen
+	for cut > 0 && !utf8.RuneStart(k[cut]) {
+		cut--
+	}
+	return k[:cut]
 }
 
 func quote(s string) string {
@@ -103,7 +160,9 @@ func quote(s string) string {
 // Flatten parses body as JSON and returns a map from JSONPath-like path
 // (e.g. "$.items[0].price") to the canonical JSON text of each leaf. Empty
 // objects and arrays are leaves ("{}" / "[]"); branches nested deeper than 64
-// levels collapse into a single "<depth-limit>" leaf. It returns (nil, false)
+// levels collapse into a single "<depth-limit>" leaf. At most 50,000 leaves
+// are kept (a "<leaf-limit>" leaf marks the cut) and object keys longer than
+// 256 bytes are truncated in paths. It returns (nil, false)
 // when body is not a single valid JSON value (including input that
 // encoding/json refuses for excessive nesting).
 func Flatten(body []byte) (map[string]string, bool) {

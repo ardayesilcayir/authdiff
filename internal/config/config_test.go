@@ -109,6 +109,7 @@ func TestValidate(t *testing.T) {
 		{"apikey empty token", func(c *Config) { c.Profiles["alice"] = Profile{Auth: Auth{Type: "apikey", Name: "k"}} }, "token"},
 		{"apikey bad in", func(c *Config) { c.Profiles["alice"] = Profile{Auth: Auth{Type: "apikey", Token: "t", In: "body"}} }, "auth.in"},
 		{"basic fields", func(c *Config) { c.Profiles["alice"] = Profile{Auth: Auth{Type: "basic"}} }, "username"},
+		{"maxResponseBytes", func(c *Config) { c.Safety.MaxResponseBytes = 50*1024*1024 + 1 }, "maxResponseBytes"},
 		{"cookie empty token", func(c *Config) { c.Profiles["alice"] = Profile{Auth: Auth{Type: "cookie", Name: "s"}} }, "token"},
 	}
 	for _, tt := range tests {

@@ -2,6 +2,7 @@ package spec
 
 import (
 	"math"
+	"sort"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
@@ -9,17 +10,43 @@ import (
 // maxExampleDepth bounds schema recursion so $ref cycles terminate.
 const maxExampleDepth = 8
 
-// Example generates a representative value for a schema: an explicit example
-// if present, otherwise the first enum value, otherwise a synthetic value of
-// the right type. Recursive schemas are cut off at maxExampleDepth.
-func Example(s *openapi3.Schema) any {
-	return example(s, 0)
+// maxExampleNodes is the schema-node budget of one exampler (one endpoint):
+// a hostile spec whose $refs fan out cannot make generation explode.
+const maxExampleNodes = 10000
+
+// exampler generates examples with a shared node budget and a memo per
+// schema, so a schema referenced many times is generated once.
+type exampler struct {
+	budget int
+	memo   map[*openapi3.Schema]any
 }
 
-func example(s *openapi3.Schema, depth int) any {
-	if s == nil || depth > maxExampleDepth {
+func newExampler() *exampler {
+	return &exampler{budget: maxExampleNodes, memo: map[*openapi3.Schema]any{}}
+}
+
+// Example generates a representative value for a schema: an explicit example
+// if present, otherwise the first enum value, otherwise a synthetic value of
+// the right type. Recursive schemas are cut off at maxExampleDepth, and at
+// most maxExampleNodes schema nodes are visited.
+func Example(s *openapi3.Schema) any {
+	return newExampler().example(s, 0)
+}
+
+func (g *exampler) example(s *openapi3.Schema, depth int) any {
+	if s == nil || depth > maxExampleDepth || g.budget <= 0 {
 		return nil
 	}
+	if v, ok := g.memo[s]; ok {
+		return v
+	}
+	g.budget--
+	v := g.generate(s, depth)
+	g.memo[s] = v
+	return v
+}
+
+func (g *exampler) generate(s *openapi3.Schema, depth int) any {
 	if s.Example != nil {
 		return s.Example
 	}
@@ -27,12 +54,12 @@ func example(s *openapi3.Schema, depth int) any {
 		return s.Enum[0]
 	}
 	if len(s.AllOf) > 0 {
-		return exampleAllOf(s, depth)
+		return g.exampleAllOf(s, depth)
 	}
 	for _, group := range []openapi3.SchemaRefs{s.AnyOf, s.OneOf} {
 		for _, ref := range group {
 			if ref != nil && ref.Value != nil && !ref.Value.Type.Is("null") {
-				return example(ref.Value, depth+1)
+				return g.example(ref.Value, depth+1)
 			}
 		}
 	}
@@ -52,9 +79,9 @@ func example(s *openapi3.Schema, depth int) any {
 		if s.Items == nil || s.Items.Value == nil {
 			return []any{}
 		}
-		return []any{example(s.Items.Value, depth+1)}
+		return []any{g.example(s.Items.Value, depth+1)}
 	case "object":
-		return exampleObject(s, depth)
+		return g.exampleObject(s, depth)
 	}
 	return nil
 }
@@ -78,29 +105,39 @@ func schemaType(s *openapi3.Schema) string {
 	return ""
 }
 
-func exampleObject(s *openapi3.Schema, depth int) any {
+func (g *exampler) exampleObject(s *openapi3.Schema, depth int) any {
 	obj := map[string]any{}
-	for name, ref := range s.Properties {
-		if ref == nil {
-			continue
+	for _, name := range sortedNames(s.Properties) {
+		if ref := s.Properties[name]; ref != nil {
+			obj[name] = g.example(ref.Value, depth+1)
 		}
-		obj[name] = example(ref.Value, depth+1)
 	}
 	return obj
 }
 
-func exampleAllOf(s *openapi3.Schema, depth int) any {
+// sortedNames returns the property names in order, so the budget is spent
+// deterministically.
+func sortedNames(props openapi3.Schemas) []string {
+	out := make([]string, 0, len(props))
+	for n := range props {
+		out = append(out, n)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func (g *exampler) exampleAllOf(s *openapi3.Schema, depth int) any {
 	merged := map[string]any{}
-	for name, ref := range s.Properties {
-		if ref != nil {
-			merged[name] = example(ref.Value, depth+1)
+	for _, name := range sortedNames(s.Properties) {
+		if ref := s.Properties[name]; ref != nil {
+			merged[name] = g.example(ref.Value, depth+1)
 		}
 	}
 	for _, ref := range s.AllOf {
 		if ref == nil || ref.Value == nil {
 			continue
 		}
-		v := example(ref.Value, depth+1)
+		v := g.example(ref.Value, depth+1)
 		m, ok := v.(map[string]any)
 		if !ok {
 			if len(merged) == 0 {

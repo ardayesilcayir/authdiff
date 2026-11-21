@@ -15,7 +15,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const maxSpecBytes = 32 * 1024 * 1024
+// maxSpecBytes is the largest spec accepted; a larger one is an error, never
+// silently truncated.
+const maxSpecBytes = 10 * 1024 * 1024
 
 // Load reads an OpenAPI 3.0 or 3.1 document (YAML or JSON) from a file path or,
 // when src starts with http:// or https://, downloads it with client.
@@ -36,13 +38,13 @@ func Load(ctx context.Context, src string, client *http.Client) (*Inventory, err
 	if doc.Info != nil {
 		inv.Title, inv.Version = doc.Info.Title, doc.Info.Version
 	}
-	lines := strings.Split(string(raw), "\n")
+	lines := lineIndex(raw)
 	if doc.Paths != nil {
 		for p, item := range doc.Paths.Map() {
 			if item == nil {
 				continue
 			}
-			inv.Endpoints = append(inv.Endpoints, pathEndpoints(doc, p, item, findLine(lines, p))...)
+			inv.Endpoints = append(inv.Endpoints, pathEndpoints(doc, p, item, lines[p])...)
 		}
 	}
 	sortEndpoints(inv.Endpoints)
@@ -51,7 +53,12 @@ func Load(ctx context.Context, src string, client *http.Client) (*Inventory, err
 
 func readSource(ctx context.Context, src string, client *http.Client) ([]byte, error) {
 	if !strings.HasPrefix(src, "http://") && !strings.HasPrefix(src, "https://") {
-		b, err := os.ReadFile(src)
+		f, err := os.Open(src)
+		if err != nil {
+			return nil, fmt.Errorf("read spec: %w", err)
+		}
+		defer func() { _ = f.Close() }()
+		b, err := readLimited(f)
 		if err != nil {
 			return nil, fmt.Errorf("read spec: %w", err)
 		}
@@ -73,24 +80,62 @@ func readSource(ctx context.Context, src string, client *http.Client) ([]byte, e
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("fetch spec %s: unexpected status %d", src, resp.StatusCode)
 	}
-	b, err := io.ReadAll(io.LimitReader(resp.Body, maxSpecBytes))
+	b, err := readLimited(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("fetch spec: %w", err)
 	}
 	return b, nil
 }
 
-// findLine returns the 1-based line where the path key first appears, or 0.
-func findLine(lines []string, p string) int {
-	for i, l := range lines {
+// readLimited reads r, failing when it holds more than maxSpecBytes.
+func readLimited(r io.Reader) ([]byte, error) {
+	b, err := io.ReadAll(io.LimitReader(r, maxSpecBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(b) > maxSpecBytes {
+		return nil, fmt.Errorf("spec larger than %d bytes", maxSpecBytes)
+	}
+	return b, nil
+}
+
+// lineIndex maps each path-like key ("/...") to the 1-based line where it
+// first appears as a YAML or JSON mapping key, in a single pass.
+func lineIndex(raw []byte) map[string]int {
+	idx := map[string]int{}
+	for i, l := range strings.Split(string(raw), "\n") {
 		t := strings.TrimSpace(l)
-		t = strings.TrimPrefix(t, "{") // single-line JSON objects
-		t = strings.TrimSpace(t)
-		if strings.HasPrefix(t, `"`+p+`"`) || strings.HasPrefix(t, `'`+p+`'`) || strings.HasPrefix(t, p+":") {
-			return i + 1
+		t = strings.TrimSpace(strings.TrimPrefix(t, "{")) // single-line JSON objects
+		key := lineKey(t)
+		if !strings.HasPrefix(key, "/") {
+			continue
+		}
+		if _, seen := idx[key]; !seen {
+			idx[key] = i + 1
 		}
 	}
-	return 0
+	return idx
+}
+
+// lineKey returns the mapping key a trimmed line starts with: a quoted
+// string, or the text before ": " or a trailing ":"; "" otherwise.
+func lineKey(t string) string {
+	if t == "" {
+		return ""
+	}
+	if q := t[0]; q == '"' || q == '\'' {
+		if end := strings.IndexByte(t[1:], q); end >= 0 {
+			return t[1 : end+1]
+		}
+		return ""
+	}
+	if i := strings.Index(t, ": "); i > 0 {
+		return t[:i]
+	}
+	if strings.HasSuffix(t, ":") {
+		return t[:len(t)-1]
+	}
+	return ""
 }
 
 func pathEndpoints(doc *openapi3.T, p string, item *openapi3.PathItem, line int) []Endpoint {
@@ -99,23 +144,24 @@ func pathEndpoints(doc *openapi3.T, p string, item *openapi3.PathItem, line int)
 		if op == nil {
 			continue
 		}
+		g := newExampler() // one node budget per endpoint
 		e := Endpoint{
 			Method:      strings.ToUpper(method),
 			Path:        p,
 			OperationID: op.OperationID,
 			Tags:        op.Tags,
-			Params:      collectParams(item.Parameters, op.Parameters),
+			Params:      collectParams(item.Parameters, op.Parameters, g),
 			Secured:     isSecured(doc, op),
 			Line:        line,
 		}
-		e.Body = collectBody(op)
+		e.Body = collectBody(op, g)
 		e.ResponseFields = responseFields(op)
 		out = append(out, e)
 	}
 	return out
 }
 
-func collectParams(pathLevel, opLevel openapi3.Parameters) []Param {
+func collectParams(pathLevel, opLevel openapi3.Parameters, g *exampler) []Param {
 	var out []Param
 	idx := map[string]int{}
 	add := func(ps openapi3.Parameters) {
@@ -124,7 +170,7 @@ func collectParams(pathLevel, opLevel openapi3.Parameters) []Param {
 				continue
 			}
 			v := ref.Value
-			p := Param{Name: v.Name, In: v.In, Required: v.Required || v.In == "path", Example: paramExample(v)}
+			p := Param{Name: v.Name, In: v.In, Required: v.Required || v.In == "path", Example: paramExample(v, g)}
 			k := v.In + ":" + v.Name
 			if i, ok := idx[k]; ok {
 				out[i] = p
@@ -139,22 +185,22 @@ func collectParams(pathLevel, opLevel openapi3.Parameters) []Param {
 	return out
 }
 
-func paramExample(p *openapi3.Parameter) any {
+func paramExample(p *openapi3.Parameter, g *exampler) any {
 	if p.Example != nil {
 		return p.Example
 	}
 	if p.Schema != nil {
-		return Example(p.Schema.Value)
+		return g.example(p.Schema.Value, 0)
 	}
 	for _, mt := range p.Content {
 		if mt != nil && mt.Schema != nil {
-			return Example(mt.Schema.Value)
+			return g.example(mt.Schema.Value, 0)
 		}
 	}
 	return nil
 }
 
-func collectBody(op *openapi3.Operation) *Body {
+func collectBody(op *openapi3.Operation, g *exampler) *Body {
 	if op.RequestBody == nil || op.RequestBody.Value == nil {
 		return nil
 	}
@@ -187,7 +233,7 @@ func collectBody(op *openapi3.Operation) *Body {
 	}
 	if mt.Schema != nil && mt.Schema.Value != nil {
 		if b.Example == nil {
-			b.Example = Example(mt.Schema.Value)
+			b.Example = g.example(mt.Schema.Value, 0)
 		}
 		b.Fields = topLevelFields(mt.Schema.Value)
 	}
@@ -196,11 +242,15 @@ func collectBody(op *openapi3.Operation) *Body {
 
 func topLevelFields(s *openapi3.Schema) []string {
 	set := map[string]struct{}{}
+	seen := map[*openapi3.Schema]bool{}
+	budget := maxExampleNodes
 	var walk func(*openapi3.Schema, int)
 	walk = func(s *openapi3.Schema, depth int) {
-		if s == nil || depth > maxExampleDepth {
+		if s == nil || depth > maxExampleDepth || seen[s] || budget <= 0 {
 			return
 		}
+		seen[s] = true
+		budget--
 		for name := range s.Properties {
 			set[name] = struct{}{}
 		}

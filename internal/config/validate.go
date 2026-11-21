@@ -10,6 +10,9 @@ import (
 	"github.com/ardayesilcayir/authdiff/internal/finding"
 )
 
+// MaxResponseBytesLimit is the largest accepted safety.maxResponseBytes.
+const MaxResponseBytesLimit = 50 * 1024 * 1024
+
 var allowedFormats = map[string]bool{"terminal": true, "json": true, "sarif": true, "html": true}
 
 // Validate checks the config and returns all problems joined together.
@@ -55,6 +58,9 @@ func Validate(c *Config) error {
 	}
 	if c.Safety.Concurrency < 1 {
 		add("safety.concurrency must be >= 1")
+	}
+	if c.Safety.MaxResponseBytes < 0 || c.Safety.MaxResponseBytes > MaxResponseBytesLimit {
+		add("safety.maxResponseBytes must be between 1 and %d (50 MiB)", MaxResponseBytesLimit)
 	}
 	if c.Safety.Proxy != "" {
 		if err := validateProxy(c.Safety.Proxy); err != nil {
