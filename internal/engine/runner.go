@@ -75,7 +75,7 @@ func Run(ctx context.Context, o RunOptions) (*finding.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	env := newEnv(o.Config, sender, o.Log)
+	env := newEnv(o.Config, sender, o.Log, o.Inventory.Endpoints...)
 	started := time.Now()
 
 	// finish assembles the result from whatever has been collected. It is
@@ -84,6 +84,7 @@ func Run(ctx context.Context, o RunOptions) (*finding.Result, error) {
 	var observations []Observation
 	eps := o.Inventory.Endpoints
 	finish := func(runErr error) (*finding.Result, error) {
+		findings = append(findings, matrixFindings(checks, o.Config, observations, findings, eps)...)
 		merged := mergeFindings(findings)
 		finding.Sort(merged)
 		keys := make(map[string]bool, len(eps))
@@ -164,6 +165,27 @@ func Run(ctx context.Context, o RunOptions) (*finding.Result, error) {
 	return finish(ctx.Err())
 }
 
+// matrixFindings runs EvaluateMatrix for the first matrix-kind check, if
+// any, and fills each finding's source line from the inventory.
+func matrixFindings(checks []Check, cfg *config.Config, obs []Observation, existing []finding.Finding, eps []spec.Endpoint) []finding.Finding {
+	for _, c := range checks {
+		if c.Rule().Kind != rules.KindMatrix {
+			continue
+		}
+		fs := EvaluateMatrix(cfg, obs, existing, c.Rule())
+		for i := range fs {
+			for _, ep := range eps {
+				if ep.Method == fs[i].Method && ep.Path == fs[i].Path {
+					fs[i].Line = ep.Line
+					break
+				}
+			}
+		}
+		return fs
+	}
+	return nil
+}
+
 // DryRun lists the requests a scan would send, in execution order, without
 // touching the network. Harvest rules are not run, so only configured IDs are used.
 func DryRun(o RunOptions) ([]PlannedRequest, error) {
@@ -174,7 +196,7 @@ func DryRun(o RunOptions) ([]PlannedRequest, error) {
 	if err != nil {
 		return nil, err
 	}
-	env := newEnv(o.Config, nil, o.Log)
+	env := newEnv(o.Config, nil, o.Log, o.Inventory.Endpoints...)
 	eps := o.Inventory.Endpoints
 	out := []PlannedRequest{}
 	for _, phase := range phasesOf(eps, checks, env) {

@@ -467,11 +467,7 @@ func TestDeterministic(t *testing.T) {
 }
 
 func TestNewChecks(t *testing.T) {
-	all, err := rules.LoadBuiltin()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := NewChecks(all); err == nil {
+	if _, err := NewChecks([]rules.Rule{{ID: "AD-NOPE-1", Kind: "nope"}}); err == nil {
 		t.Error("want error for kinds without a registered check")
 	}
 	cs, err := NewChecks(templateRules(t))

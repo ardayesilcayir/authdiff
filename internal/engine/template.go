@@ -101,22 +101,7 @@ func bindings(r *rules.Rule, ep spec.Endpoint, env *Env) []binding {
 		}
 	}
 	if used["any_user"] {
-		var first, filled *identity.Profile
-		for _, p := range ps {
-			if p.IsAnonymous() {
-				continue
-			}
-			if first == nil {
-				first = p
-			}
-			if filled == nil && env.Pool.HasAll(p.Name, params) {
-				filled = p
-			}
-		}
-		if filled == nil {
-			filled = first
-		}
-		singles["any_user"] = filled
+		singles["any_user"] = anyUser(ep, env)
 	}
 
 	var multi []string
@@ -153,6 +138,26 @@ func bindings(r *rules.Rule, ep spec.Endpoint, env *Env) []binding {
 	}
 	rec(0)
 	return out
+}
+
+// anyUser is the profile bound to the any_user role on ep: the first
+// non-anonymous profile by name that owns every path parameter, else the
+// first non-anonymous profile; nil when there is none.
+func anyUser(ep spec.Endpoint, env *Env) *identity.Profile {
+	params := ep.PathParams()
+	var first *identity.Profile
+	for _, p := range sortedProfiles(env.Profiles) {
+		if p.IsAnonymous() {
+			continue
+		}
+		if env.Pool.HasAll(p.Name, params) {
+			return p
+		}
+		if first == nil {
+			first = p
+		}
+	}
+	return first
 }
 
 // candidate reports whether non-anonymous profile p can fill a multi-valued role.
@@ -252,34 +257,23 @@ func (t *templateCheck) runBinding(ctx context.Context, ep spec.Endpoint, env *E
 		req, err := env.Builder.Build(ep, method, idSource(s, b), s.Body)
 		if err != nil {
 			// A body that cannot be built skips this combination, never the scan.
-			env.logger().Warn("build request", "rule", r.ID, "endpoint", ep.Key(), "step", s.Name, "err", err)
-			obs = append(obs, Observation{Endpoint: method + " " + ep.Path, Profile: sr.profile.Name,
-				Err: fmt.Sprintf("rule %s step %s: build request: %v", r.ID, s.Name, err)})
+			obs = append(obs, buildFailed(env, r.ID, ep, method, sr.profile.Name, s.Name, err))
 			return nil, obs, nil
 		}
 		sr.req, sr.built = req, true
-		o := Observation{Endpoint: method + " " + ep.Path, Profile: sr.profile.Name, OwnIDs: req.OwnedBy(sr.profile.Name)}
 		if s.SkipDestructive && isDestructive(method) {
-			obs = append(obs, o)
+			obs = append(obs, Observation{Endpoint: method + " " + ep.Path, Profile: sr.profile.Name, OwnIDs: req.OwnedBy(sr.profile.Name)})
 			continue
 		}
-		resp, err := env.Sender.Send(ctx, sr.profile, s.Name, req)
+		resp, o, err := probe(ctx, env, r.ID, sr.profile, s.Name, req)
+		obs = append(obs, o)
 		if err != nil {
-			// Only the caller's cancellation aborts. A per-request timeout also
-			// matches context.DeadlineExceeded but is an ordinary failed probe.
-			if ctx.Err() != nil {
-				return nil, obs, ctx.Err()
-			}
-			if !errors.Is(err, transport.ErrDestructiveBlocked) && !errors.Is(err, transport.ErrOutOfScope) {
-				o.Err = err.Error()
-				env.logger().Debug("request failed", "rule", r.ID, "step", s.Name, "err", err)
-			}
-			obs = append(obs, o)
+			return nil, obs, err
+		}
+		if resp == nil {
 			continue
 		}
 		sr.resp = resp
-		o.Sent, o.Status = true, resp.Status
-		obs = append(obs, o)
 		if err := sendRepeats(ctx, env, sr.profile, s, req, resp, dyn); err != nil {
 			return nil, obs, err
 		}
@@ -316,8 +310,21 @@ func (t *templateCheck) runBinding(ctx context.Context, ep spec.Endpoint, env *E
 	}
 
 	victim, attacker := results[r.Victim], results[r.Attacker]
-	f := finding.Finding{
-		ID:          finding.NewID(r.ID, ep.Method, ep.Path, profileName(victim), profileName(attacker)),
+	f := newFinding(r, ep, ep.Method, profileName(victim), profileName(attacker), conf)
+	f.Similarity = sim(stepEnv(victim).Body, stepEnv(attacker).Body)
+	for _, s := range r.Steps {
+		if sr := results[s.Name]; sr.resp != nil {
+			f.Evidence = append(f.Evidence, sr.resp.Exchange)
+		}
+	}
+	return &f, obs, nil
+}
+
+// newFinding builds a finding of rule r on method + ep.Path with the rule's
+// metadata; evidence and similarity are left to the caller.
+func newFinding(r *rules.Rule, ep spec.Endpoint, method, victim, attacker string, conf finding.Confidence) finding.Finding {
+	return finding.Finding{
+		ID:          finding.NewID(r.ID, method, ep.Path, victim, attacker),
 		RuleID:      r.ID,
 		Title:       r.Name,
 		Description: strings.TrimSpace(r.Description),
@@ -326,21 +333,51 @@ func (t *templateCheck) runBinding(ctx context.Context, ep spec.Endpoint, env *E
 		Severity:    r.Severity,
 		CVSS:        r.CVSS,
 		Confidence:  conf,
-		Method:      ep.Method,
+		Method:      method,
 		Path:        ep.Path,
 		Line:        ep.Line,
-		Victim:      profileName(victim),
-		Attacker:    profileName(attacker),
-		Similarity:  sim(stepEnv(victim).Body, stepEnv(attacker).Body),
+		Victim:      victim,
+		Attacker:    attacker,
 		Remediation: r.Remediation,
 	}
-	for _, s := range r.Steps {
-		if sr := results[s.Name]; sr.resp != nil {
-			f.Evidence = append(f.Evidence, sr.resp.Exchange)
-		}
-	}
-	return &f, obs, nil
 }
+
+// probe sends req as p and records it as an observation of
+// "req.Method req.Endpoint.Path". The response is nil when the request was
+// not answered: blocked by safe mode or scope (a skipped observation) or
+// failed (an errored one). The error is non-nil only when ctx is done.
+func probe(ctx context.Context, env *Env, ruleID string, p *identity.Profile, step string, req planner.Request) (*transport.Response, Observation, error) {
+	o := Observation{Endpoint: req.Method + " " + req.Endpoint.Path, Profile: p.Name, OwnIDs: req.OwnedBy(p.Name)}
+	resp, err := env.Sender.Send(ctx, p, step, req)
+	if err != nil {
+		// Only the caller's cancellation aborts. A per-request timeout also
+		// matches context.DeadlineExceeded but is an ordinary failed probe.
+		if ctx.Err() != nil {
+			return nil, o, ctx.Err()
+		}
+		if !errors.Is(err, transport.ErrDestructiveBlocked) && !errors.Is(err, transport.ErrOutOfScope) {
+			o.Err = err.Error()
+			env.logger().Debug("request failed", "rule", ruleID, "step", step, "err", err)
+		}
+		return nil, o, nil
+	}
+	o.Sent, o.Status = true, resp.Status
+	if isOK(resp.Status) {
+		ex := resp.Exchange
+		o.Exchange = &ex
+	}
+	return resp, o, nil
+}
+
+// buildFailed logs a request that could not be built and returns the
+// errored observation recorded for it.
+func buildFailed(env *Env, ruleID string, ep spec.Endpoint, method, profile, step string, err error) Observation {
+	env.logger().Warn("build request", "rule", ruleID, "endpoint", ep.Key(), "step", step, "err", err)
+	return Observation{Endpoint: method + " " + ep.Path, Profile: profile,
+		Err: fmt.Sprintf("rule %s step %s: build request: %v", ruleID, step, err)}
+}
+
+func isOK(status int) bool { return status >= 200 && status < 300 }
 
 func profileName(sr *stepResult) string {
 	if sr == nil || sr.profile == nil {
@@ -393,13 +430,5 @@ func matrixForbids(env *Env, ep spec.Endpoint, sr *stepResult) bool {
 		return false
 	}
 	p := sr.profile
-	for _, a := range allow {
-		if strings.EqualFold(a, p.Name) || strings.EqualFold(a, p.Role) {
-			return false
-		}
-		if strings.EqualFold(a, "owner") && sr.built && sr.req.OwnedBy(p.Name) {
-			return false
-		}
-	}
-	return true
+	return !matrixAllows(allow, p.Name, p.Role, sr.built && sr.req.OwnedBy(p.Name))
 }

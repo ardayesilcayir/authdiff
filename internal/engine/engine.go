@@ -27,6 +27,9 @@ type Env struct {
 	Builder  *planner.Builder
 	Sender   Sender
 	Log      *slog.Logger
+	// Endpoints is the whole inventory, for checks that look at sibling
+	// operations of the same path.
+	Endpoints []spec.Endpoint
 
 	matrix map[string][]string // config.Matrix as pattern -> allowed roles
 }
@@ -38,6 +41,9 @@ type Observation struct {
 	Status            int
 	Sent, OwnIDs      bool
 	Err               string
+	// Exchange is the recorded evidence of a sent 2xx probe (nil otherwise),
+	// used by the post-run matrix evaluation.
+	Exchange *finding.Exchange
 }
 
 // Outcome is what a check produced for one endpoint.
@@ -128,7 +134,11 @@ func (e *Env) Matrix() map[string][]string {
 // matrixAllow returns the union of the allow lists of every matrix rule
 // matching ep, and whether any rule matched.
 func (e *Env) matrixAllow(ep spec.Endpoint) ([]string, bool) {
-	m := e.Matrix()
+	return matrixAllowOf(e.Matrix(), ep)
+}
+
+// matrixAllowOf is matrixAllow for an explicit pattern -> roles matrix.
+func matrixAllowOf(m map[string][]string, ep spec.Endpoint) ([]string, bool) {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
@@ -160,7 +170,7 @@ func (e *Env) threshold() float64 {
 }
 
 // newEnv builds the shared environment from the config.
-func newEnv(c *config.Config, s Sender, log *slog.Logger) *Env {
+func newEnv(c *config.Config, s Sender, log *slog.Logger, eps ...spec.Endpoint) *Env {
 	profiles := identity.FromConfig(c)
 	names := make([]string, len(profiles))
 	for i, p := range profiles {
@@ -168,12 +178,13 @@ func newEnv(c *config.Config, s Sender, log *slog.Logger) *Env {
 	}
 	pool := identity.NewPool(c)
 	return &Env{
-		Config:   c,
-		Profiles: profiles,
-		Pool:     pool,
-		Builder:  planner.NewBuilder(c.Target.BaseURL, c.Bodies, pool, names),
-		Sender:   s,
-		Log:      log,
-		matrix:   matrixOf(c),
+		Config:    c,
+		Profiles:  profiles,
+		Pool:      pool,
+		Builder:   planner.NewBuilder(c.Target.BaseURL, c.Bodies, pool, names),
+		Sender:    s,
+		Log:       log,
+		Endpoints: eps,
+		matrix:    matrixOf(c),
 	}
 }
