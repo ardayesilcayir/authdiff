@@ -173,7 +173,7 @@ func exampleInteger(s *openapi3.Schema) int {
 		return 1
 	}
 	v := int(math.Ceil(*s.Min))
-	if s.ExclusiveMin && float64(v) == *s.Min {
+	if s.ExclusiveMin.IsTrue() && float64(v) == *s.Min {
 		v++
 	}
 	return v
