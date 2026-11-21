@@ -57,12 +57,18 @@ Detection code never creates its own HTTP client. It receives a
    `allowDestructive` is set. Refusals are counted as blocked.
 3. **Rate limit**: a token bucket shared by all workers (default 5 requests per
    second).
-4. **Base transport** with TLS verification on (unless `--insecure`), a
-   per-request timeout and a response size limit (5 MB, larger bodies are
-   truncated and flagged).
+4. **Base transport** with TLS verification on (unless `--insecure`), no
+   proxy unless `safety.proxy` / `--proxy` is set (the environment's
+   `HTTP(S)_PROXY` is ignored), and a response size limit (5 MB, larger bodies
+   are truncated and flagged).
 
-Around the chain, the client retries network errors and `429`/`503` up to 3
-times with exponential backoff, sets the `User-Agent`
+Before sending, the client checks scope and safe mode itself (a blocked
+request never waits for a rate-limit token), then waits for the limiter with
+the caller's context, and only then starts the attempt under its own
+per-attempt timeout. Redirects that leave the original `host:port` or
+downgrade `https` to `http` are refused. The client retries `429`/`503` (any
+method) and network errors (`GET`/`HEAD`/`OPTIONS` only) up to 3 times with
+exponential backoff, sets the `User-Agent`
 `authdiff/<version> (+https://github.com/ardayesilcayir/authdiff)` and records
 each exchange with secrets masked. Because these controls live below the
 engine, a new rule, built-in or custom, cannot bypass them. Even the spec

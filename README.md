@@ -120,7 +120,8 @@ Without Docker: `cd vuln-lab && python -m venv .venv && .venv/bin/pip install -r
 
 Common `scan` flags: `--rate 5`, `--concurrency 4`, `--allow-destructive`,
 `--fail-on high`, `--format terminal,json,sarif,html`, `--output ./out`,
-`--include "/orders/**"`, `--rules ./rules`, `--ignore-file`, `--insecure`.
+`--include "/orders/**"`, `--rules ./rules`, `--ignore-file`, `--insecure`,
+`--proxy`.
 Global: `-v`, `--log-format json`, `--no-color`.
 
 Exit codes: `0` no active finding at the `--fail-on` threshold, `1` threshold
@@ -208,7 +209,13 @@ The safety defaults are "off" and stay that way unless you change them:
   design.
 - Tokens are masked in logs and every report; the HTML report escapes target
   content and ships a Content Security Policy; TLS verification is on by
-  default.
+  default, and `--insecure` is logged as a warning and shown in every report.
+- Redirects that downgrade `https` to `http` or go to a different
+  `host:port` are refused, so credentials are never forwarded.
+- `HTTP_PROXY` / `HTTPS_PROXY` are ignored; a proxy is used only when set
+  with `safety.proxy` or `--proxy` (logged at start).
+- Network errors are retried only for `GET`/`HEAD`/`OPTIONS`, so a write is
+  never sent twice because of a dropped connection.
 
 For bug bounty programs, read the program's scope and rules first, use a low
 `--rate`, and test only with accounts you control.

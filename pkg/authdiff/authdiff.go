@@ -38,6 +38,7 @@ type Overrides struct {
 	Concurrency      *int
 	AllowDestructive *bool
 	Insecure         *bool
+	Proxy            *string
 	FailOn           *string
 	Formats          []string
 	OutputDir        *string
@@ -105,6 +106,9 @@ func applyOverrides(cfg *config.Config, o Overrides) {
 	}
 	if o.Insecure != nil {
 		cfg.Safety.Insecure = *o.Insecure
+	}
+	if o.Proxy != nil {
+		cfg.Safety.Proxy = strings.TrimSpace(*o.Proxy)
 	}
 	if o.FailOn != nil {
 		cfg.Output.FailOn = *o.FailOn
@@ -176,8 +180,22 @@ func LoadRules(dirs, disable []string) ([]rules.Rule, error) {
 	return out, nil
 }
 
-// newClient builds the scoped transport for cfg.
-func newClient(cfg *config.Config, version string) (*transport.Client, error) {
+// insecureNote is the warning logged and added to reports when TLS
+// verification is off.
+const insecureNote = "TLS verification disabled (safety.insecure / --insecure): responses may come from an impostor"
+
+// newClient builds the scoped transport for cfg, logging the settings that
+// weaken it (disabled TLS verification at Warn, an explicit proxy at Info).
+func newClient(cfg *config.Config, version string, log *slog.Logger) (*transport.Client, error) {
+	log = logger(log)
+	if cfg.Safety.Insecure {
+		log.Warn(insecureNote)
+	}
+	if cfg.Safety.Proxy != "" {
+		// The proxy sees every request, credentials included; it is not
+		// checked against scope.allowHosts.
+		log.Info("using proxy for all requests", "proxy", RedactURL(cfg.Safety.Proxy))
+	}
 	return transport.New(transport.Options{
 		AllowHosts:       cfg.Scope.AllowHosts,
 		Rate:             cfg.Safety.Rate,
@@ -185,6 +203,7 @@ func newClient(cfg *config.Config, version string) (*transport.Client, error) {
 		Timeout:          cfg.Safety.Timeout,
 		MaxResponseBytes: cfg.Safety.MaxResponseBytes,
 		Insecure:         cfg.Safety.Insecure,
+		Proxy:            cfg.Safety.Proxy,
 		UserAgent:        UserAgent(version),
 		Secrets:          append(cfg.Secrets(), urlSecrets(cfg, false)...),
 		Retries:          maxRetries,
@@ -218,7 +237,7 @@ func LoadInventory(ctx context.Context, path string, o Overrides, version string
 	}
 	var client *transport.Client
 	if isURL(cfg.Target.Spec) {
-		if client, err = newClient(cfg, version); err != nil {
+		if client, err = newClient(cfg, version, nil); err != nil {
 			return nil, err
 		}
 	}
@@ -271,7 +290,7 @@ func Scan(ctx context.Context, o ScanOptions) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	client, err := newClient(cfg, o.Version)
+	client, err := newClient(cfg, o.Version, log)
 	if err != nil {
 		return nil, err
 	}
@@ -291,6 +310,9 @@ func Scan(ctx context.Context, o ScanOptions) (*Result, error) {
 	res.Target = RedactURL(cfg.Target.BaseURL)
 	res.SpecPath = inv.SpecPath
 	res.Findings = baseline.Apply(res.Findings)
+	if cfg.Safety.Insecure {
+		res.Notes = append(res.Notes, insecureNote)
+	}
 	log.Info("scan finished", "findings", len(res.Findings), "active", len(res.Active()),
 		"requests", res.Stats.Requests, "blocked", res.Stats.Blocked, "errors", res.Stats.Errors)
 	return res, runErr
@@ -327,7 +349,7 @@ func PlanContext(ctx context.Context, o ScanOptions) ([]engine.PlannedRequest, e
 	}
 	var client *transport.Client
 	if isURL(cfg.Target.Spec) {
-		if client, err = newClient(cfg, o.Version); err != nil {
+		if client, err = newClient(cfg, o.Version, log); err != nil {
 			return nil, err
 		}
 		log.Info("dry run: downloading spec", "url", RedactURL(cfg.Target.Spec))

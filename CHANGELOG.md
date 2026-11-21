@@ -43,6 +43,14 @@ follows [Semantic Versioning](https://semver.org/).
   profile owns is skipped; method swap never probes as an admin and never
   sends destructive methods to collection paths; the `DELETE` phase runs
   sequentially; mass assignment no longer tests admin profiles.
+- Redirects from `https` to `http` or to a different `host:port` are refused,
+  so `Authorization`, cookies and custom API key headers are never forwarded.
+- `HTTP_PROXY` / `HTTPS_PROXY` are ignored; a proxy is used only when set
+  with the new `safety.proxy` key or `--proxy` flag, and is logged.
+- Network errors are retried only for `GET`/`HEAD`/`OPTIONS`; `429`/`503`
+  are still retried for any method.
+- `--insecure` logs a warning and adds a "TLS verification disabled" note to
+  the terminal, JSON and HTML reports.
 
 ### Fixed
 

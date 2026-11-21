@@ -82,6 +82,11 @@ func WriteTerminal(w io.Writer, r *finding.Result, color bool) error {
 			}
 		}
 	}
+	for _, n := range r.Notes {
+		if _, err := fmt.Fprintf(w, "\nWarning: %s\n", n); err != nil {
+			return err
+		}
+	}
 	dur := r.FinishedAt.Sub(r.StartedAt).Round(time.Millisecond)
 	_, err := fmt.Fprintf(w, "\n%d findings (%d suppressed) · %d requests · %d blocked · %d errors · %s\n",
 		len(active), suppressed, r.Stats.Requests, r.Stats.Blocked, r.Stats.Errors, dur)

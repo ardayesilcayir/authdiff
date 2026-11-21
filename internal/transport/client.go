@@ -9,6 +9,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -29,6 +30,10 @@ const (
 
 var errTooManyRedirects = errors.New("stopped after 5 redirects")
 
+// errRedirectRefused is returned (wrapped) for a redirect that would leak
+// credentials: an https -> http downgrade or a different host:port.
+var errRedirectRefused = errors.New("redirect refused")
+
 // Options configures a Client.
 type Options struct {
 	AllowHosts       []string
@@ -40,7 +45,10 @@ type Options struct {
 	UserAgent        string
 	Secrets          []string
 	Retries          int
-	Base             http.RoundTripper // for tests; nil clones http.DefaultTransport
+	// Proxy is an explicit proxy URL (http, https or socks5). Empty means no
+	// proxy: HTTP_PROXY / HTTPS_PROXY are deliberately ignored.
+	Proxy string
+	Base  http.RoundTripper // for tests; nil clones http.DefaultTransport
 }
 
 // Response is the outcome of one Client.Do call. Header and Body are the raw
@@ -98,19 +106,27 @@ func New(o Options) (*Client, error) {
 		o.UserAgent = defaultUserAgent
 	}
 
+	var proxy *url.URL
+	if o.Proxy != "" {
+		u, err := ParseProxy(o.Proxy)
+		if err != nil {
+			return nil, err
+		}
+		proxy = u
+	}
 	base := o.Base
 	if base == nil {
-		base = newBaseTransport(o.Insecure)
+		base = newBaseTransport(o.Insecure, proxy)
 	}
 	limited := NewRateLimit(o.Rate, base)
 	limit, _ := limited.(*rateLimit)
 	safe := &safeMode{allowDestructive: o.AllowDestructive, next: limited}
 	scope := newScope(o.AllowHosts, safe)
-	checkRedirect := func(_ *http.Request, via []*http.Request) error {
+	checkRedirect := func(req *http.Request, via []*http.Request) error {
 		if len(via) > maxRedirects {
 			return errTooManyRedirects
 		}
-		return nil
+		return checkRedirectTarget(scope, req, via)
 	}
 
 	return &Client{
@@ -127,12 +143,60 @@ func New(o Options) (*Client, error) {
 	}, nil
 }
 
-func newBaseTransport(insecure bool) http.RoundTripper {
+// checkRedirectTarget refuses a redirect that would leak credentials. An
+// out-of-scope target is reported as ErrOutOfScope (blocked); an https ->
+// http downgrade, or a different host:port than the original request (which
+// would receive custom credential headers such as X-API-Key that net/http
+// keeps on redirects), is a non-retryable errRedirectRefused.
+func checkRedirectTarget(scope *scopeTransport, req *http.Request, via []*http.Request) error {
+	if err := scope.check(req.URL); err != nil {
+		return err
+	}
+	orig, prev := via[0], via[len(via)-1]
+	to, err := requestKey(req.URL)
+	if err != nil {
+		return err
+	}
+	for _, from := range []*http.Request{orig, prev} {
+		if strings.EqualFold(from.URL.Scheme, "https") && !strings.EqualFold(req.URL.Scheme, "https") {
+			return fmt.Errorf("%w: https to %s downgrade (%s)", errRedirectRefused, req.URL.Scheme, to)
+		}
+	}
+	if fromKey, err := requestKey(orig.URL); err != nil || fromKey != to {
+		return fmt.Errorf("%w: target %s is not the original host:port", errRedirectRefused, to)
+	}
+	return nil
+}
+
+// ParseProxy validates an explicit proxy URL: http, https or socks5 with a host.
+func ParseProxy(s string) (*url.URL, error) {
+	u, err := url.Parse(strings.TrimSpace(s))
+	if err != nil {
+		return nil, errors.New("transport: proxy is not a valid URL")
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "http", "https", "socks5":
+	default:
+		return nil, fmt.Errorf("transport: proxy scheme must be http, https or socks5, got %q", u.Scheme)
+	}
+	if u.Host == "" {
+		return nil, errors.New("transport: proxy URL has no host")
+	}
+	return u, nil
+}
+
+func newBaseTransport(insecure bool, proxy *url.URL) http.RoundTripper {
 	var tr *http.Transport
 	if dt, ok := http.DefaultTransport.(*http.Transport); ok {
 		tr = dt.Clone()
 	} else {
 		tr = &http.Transport{}
+	}
+	// The environment's proxy settings are ignored: credentials would go to a
+	// host nobody listed. A proxy is used only when configured explicitly.
+	tr.Proxy = nil
+	if proxy != nil {
+		tr.Proxy = http.ProxyURL(proxy)
 	}
 	if insecure {
 		// #nosec G402 -- verification is skipped only when the user passes --insecure explicitly.
@@ -152,8 +216,9 @@ func (c *Client) Stats() (requests, blocked, errors int) {
 	return int(c.requests.Load()), int(c.blocked.Load()), int(c.errs.Load())
 }
 
-// Do sends req, retrying network errors and 429/503 responses up to
-// Options.Retries times. Scope and safe-mode errors are never retried.
+// Do sends req, retrying 429/503 responses (any method) and network errors
+// (GET, HEAD and OPTIONS only) up to Options.Retries times. Scope, safe-mode
+// and refused-redirect errors are never retried.
 func (c *Client) Do(ctx context.Context, req *http.Request) (*Response, error) {
 	c.requests.Add(1)
 	resp, err := c.do(ctx, req)
@@ -219,7 +284,9 @@ func (c *Client) do(ctx context.Context, req *http.Request) (*Response, error) {
 		dur := time.Since(start)
 
 		if err != nil {
-			if !retryableError(err) || ctx.Err() != nil || attempt >= c.retries {
+			// A network error may hit after the server processed the request,
+			// so only idempotent methods are retried.
+			if !retryableError(err) || !idempotent(r.Method) || ctx.Err() != nil || attempt >= c.retries {
 				return nil, err
 			}
 			if werr := sleep(ctx, retryDelay(attempt, nil)); werr != nil {
@@ -276,7 +343,17 @@ func (c *Client) readBody(rc io.ReadCloser) ([]byte, bool, error) {
 func retryableError(err error) bool {
 	return !errors.Is(err, ErrOutOfScope) &&
 		!errors.Is(err, ErrDestructiveBlocked) &&
-		!errors.Is(err, errTooManyRedirects)
+		!errors.Is(err, errTooManyRedirects) &&
+		!errors.Is(err, errRedirectRefused)
+}
+
+// idempotent reports whether a network error on method may be retried.
+func idempotent(method string) bool {
+	switch strings.ToUpper(method) {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return true
+	}
+	return false
 }
 
 // retryDelay is the wait before retry number attempt+1. A Retry-After header

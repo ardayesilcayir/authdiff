@@ -105,7 +105,8 @@ include the `baseUrl` host.
 | `allowDestructive` | `false` | `DELETE`, `PUT` and `PATCH` are blocked unless `true`. Blocked requests are counted in the stats. CLI: `--allow-destructive`. Even when `true`, a destructive request is sent only when every path ID belongs to a configured profile (`owns` or harvest); others are skipped. |
 | `timeout` | `10s` | Per-attempt request timeout (Go duration). Time spent waiting for the rate limiter is not counted. |
 | `maxResponseBytes` | `5242880` (5 MB) | Larger responses are truncated and marked `truncated` in evidence. |
-| `insecure` | `false` | Skip TLS certificate verification. CLI: `--insecure`. |
+| `insecure` | `false` | Skip TLS certificate verification. Logged as a warning and shown in every report. CLI: `--insecure`. |
+| `proxy` | none | Explicit proxy URL (`http`, `https` or `socks5`) for every request. `HTTP_PROXY` / `HTTPS_PROXY` are ignored. The proxy sees all traffic, credentials included, and is not checked against `allowHosts`; its use is logged at start. CLI: `--proxy`. |
 
 **Safe mode still sends `POST`.** `POST` is not blocked: mass assignment
 (`AD-MASS-001`), method swap (`AD-METHOD-001`) and template rules on `POST`
@@ -113,8 +114,13 @@ operations send real `POST` requests that **create objects** on the target,
 even without `allowDestructive`. Use a test environment you can reset, or
 exclude those operations with `filter.exclude`.
 
-Network errors and `429`/`503` responses are retried up to 3 times with
-exponential backoff.
+`429`/`503` responses are retried up to 3 times with exponential backoff, for
+any method. Network errors are retried the same way only for `GET`, `HEAD`
+and `OPTIONS`: a write may have been processed before the connection broke.
+
+Redirects are followed (at most 5) only within the original `host:port` and
+never from `https` to `http`; other redirects are refused and recorded as
+errors, so credentials are never forwarded.
 
 ## `profiles` (at least one)
 

@@ -56,6 +56,11 @@ func Validate(c *Config) error {
 	if c.Safety.Concurrency < 1 {
 		add("safety.concurrency must be >= 1")
 	}
+	if c.Safety.Proxy != "" {
+		if err := validateProxy(c.Safety.Proxy); err != nil {
+			add("safety.proxy: %v", err)
+		}
+	}
 	if c.Compare.SimilarityThreshold < 0 || c.Compare.SimilarityThreshold > 1 {
 		add("compare.similarityThreshold must be within [0,1]")
 	}
@@ -98,6 +103,24 @@ func validateAuth(a Auth) error {
 	case "none":
 	default:
 		return fmt.Errorf("unknown auth type %q (want bearer, cookie, apikey, basic or none)", a.Type)
+	}
+	return nil
+}
+
+// validateProxy accepts an http, https or socks5 URL with a host. The
+// message never quotes the URL, which may carry credentials.
+func validateProxy(s string) error {
+	u, err := url.Parse(strings.TrimSpace(s))
+	if err != nil {
+		return errors.New("not a valid URL")
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "http", "https", "socks5":
+	default:
+		return errors.New("scheme must be http, https or socks5")
+	}
+	if u.Host == "" {
+		return errors.New("URL has no host")
 	}
 	return nil
 }

@@ -123,7 +123,7 @@ Docker olmadan: `cd vuln-lab && python -m venv .venv && .venv/bin/pip install -r
 Sık kullanılan `scan` bayrakları: `--rate 5`, `--concurrency 4`,
 `--allow-destructive`, `--fail-on high`, `--format terminal,json,sarif,html`,
 `--output ./out`, `--include "/orders/**"`, `--rules ./rules`,
-`--ignore-file`, `--insecure`. Genel: `-v`, `--log-format json`, `--no-color`.
+`--ignore-file`, `--insecure`, `--proxy`. Genel: `-v`, `--log-format json`, `--no-color`.
 
 Çıkış kodları: `0` `--fail-on` eşiğinde aktif bulgu yok, `1` eşik aşıldı,
 `2` hata; hiçbir isteğin HTTP yanıtı almadığı (yani hiçbir şeyin test
@@ -212,7 +212,14 @@ Güvenlik varsayılanları "kapalı" başlar ve siz değiştirmedikçe öyle kal
   yoktur.
 - Token'lar log'larda ve tüm raporlarda maskelenir; HTML rapor hedeften gelen
   içeriği escape eder ve Content Security Policy içerir; TLS doğrulaması
-  varsayılan olarak açıktır.
+  varsayılan olarak açıktır, `--insecure` uyarı olarak loglanır ve her raporda
+  gösterilir.
+- `https`'ten `http`'ye düşüren veya farklı bir `host:port`'a giden
+  redirect'ler reddedilir; kimlik bilgileri başka yere iletilmez.
+- `HTTP_PROXY` / `HTTPS_PROXY` yok sayılır; proxy yalnızca `safety.proxy` veya
+  `--proxy` ile verildiğinde kullanılır (başlangıçta loglanır).
+- Ağ hataları yalnızca `GET`/`HEAD`/`OPTIONS` için yeniden denenir; bağlantı
+  koptu diye bir yazma isteği iki kez gönderilmez.
 
 Bug bounty programlarında önce programın kapsamını ve kurallarını okuyun,
 düşük bir `--rate` kullanın ve yalnızca kontrolünüzdeki hesaplarla test edin.

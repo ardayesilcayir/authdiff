@@ -98,16 +98,19 @@ type Tool struct {
 
 // Result is the full output of a scan.
 type Result struct {
-	Tool       Tool         `json:"tool"`
-	Target     string       `json:"target"`
-	SpecPath   string       `json:"specPath"`
-	StartedAt  time.Time    `json:"startedAt"`
-	FinishedAt time.Time    `json:"finishedAt"`
-	Profiles   []string     `json:"profiles"`
-	Stats      Stats        `json:"stats"`
-	Rules      []RuleMeta   `json:"rules"`
-	Findings   []Finding    `json:"findings"`
-	Matrix     []MatrixCell `json:"matrix"`
+	Tool       Tool      `json:"tool"`
+	Target     string    `json:"target"`
+	SpecPath   string    `json:"specPath"`
+	StartedAt  time.Time `json:"startedAt"`
+	FinishedAt time.Time `json:"finishedAt"`
+	Profiles   []string  `json:"profiles"`
+	Stats      Stats     `json:"stats"`
+	// Notes are warnings about how the scan ran (e.g. TLS verification
+	// disabled), shown in every report.
+	Notes    []string     `json:"notes,omitempty"`
+	Rules    []RuleMeta   `json:"rules"`
+	Findings []Finding    `json:"findings"`
+	Matrix   []MatrixCell `json:"matrix"`
 }
 
 // Sort orders findings by severity (descending), then RuleID, Method, Path, Victim, Attacker.

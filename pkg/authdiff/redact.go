@@ -57,7 +57,7 @@ const minURLSecret = 8
 // skipped.
 func urlSecrets(cfg *config.Config, all bool) []string {
 	var out []string
-	for _, raw := range []string{cfg.Target.BaseURL, cfg.Target.Spec} {
+	for _, raw := range []string{cfg.Target.BaseURL, cfg.Target.Spec, cfg.Safety.Proxy} {
 		if !isURL(raw) {
 			continue
 		}
@@ -88,7 +88,7 @@ type scrubber struct{ r *strings.Replacer }
 
 func newScrubber(cfg *config.Config) *scrubber {
 	var pairs []string
-	for _, raw := range []string{cfg.Target.BaseURL, cfg.Target.Spec} {
+	for _, raw := range []string{cfg.Target.BaseURL, cfg.Target.Spec, cfg.Safety.Proxy} {
 		if isURL(raw) {
 			pairs = append(pairs, raw, RedactURL(raw))
 		}

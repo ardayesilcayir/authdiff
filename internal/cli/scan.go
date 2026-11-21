@@ -17,6 +17,7 @@ import (
 func (a *app) scanCmd() *cobra.Command {
 	var (
 		cfgPath, ignoreFile, failOn, output string
+		proxy                               string
 		rate                                float64
 		concurrency                         int
 		allowDestructive, insecure, dryRun  bool
@@ -42,6 +43,9 @@ func (a *app) scanCmd() *cobra.Command {
 			if f.Changed("insecure") {
 				ov.Insecure = &insecure
 			}
+			if f.Changed("proxy") {
+				ov.Proxy = &proxy
+			}
 			if f.Changed("fail-on") {
 				ov.FailOn = &failOn
 			}
@@ -63,6 +67,7 @@ func (a *app) scanCmd() *cobra.Command {
 	fl.IntVar(&concurrency, "concurrency", 4, "endpoints tested in parallel")
 	fl.BoolVar(&allowDestructive, "allow-destructive", false, "allow DELETE, PUT and PATCH requests")
 	fl.BoolVar(&insecure, "insecure", false, "skip TLS certificate verification")
+	fl.StringVar(&proxy, "proxy", "", "send all requests through this proxy URL (HTTP(S)_PROXY are ignored)")
 	fl.StringVar(&failOn, "fail-on", "", "exit 1 if an active finding has at least this severity (info|low|medium|high|critical)")
 	fl.StringSliceVar(&formats, "format", nil, "report formats, comma separated: terminal,json,sarif,html")
 	fl.StringVarP(&output, "output", "o", "", "report output directory")

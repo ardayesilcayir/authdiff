@@ -48,6 +48,9 @@ type Safety struct {
 	Timeout          time.Duration `yaml:"timeout"`
 	MaxResponseBytes int64         `yaml:"maxResponseBytes"`
 	Insecure         bool          `yaml:"insecure"`
+	// Proxy is an explicit proxy URL; empty means none (HTTP(S)_PROXY are
+	// ignored).
+	Proxy string `yaml:"proxy"`
 }
 
 // Profile is one identity used during a scan.

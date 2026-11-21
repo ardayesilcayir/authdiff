@@ -20,6 +20,7 @@ a:focus-visible,summary:focus-visible{outline:2px solid var(--link);outline-offs
 h1{font-size:1.6rem;margin:0 0 4px}
 h2{font-size:1.15rem;margin:40px 0 12px}
 .meta{color:var(--muted);margin:0;overflow-wrap:anywhere}
+.note{margin:12px 0 0;padding:8px 12px;border:1px solid var(--line);border-left:4px solid var(--high);border-radius:6px;background:var(--surface)}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin:24px 0 0}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px}
 .card b{display:block;font-size:1.6rem;line-height:1.2;font-variant-numeric:tabular-nums}
@@ -63,6 +64,9 @@ summary{cursor:pointer;color:var(--muted)}
 <h1>authdiff report</h1>
 <p class="meta">{{.R.Target}} · {{.R.SpecPath}} · {{.R.Tool.Name}} {{.R.Tool.Version}}</p>
 <p class="meta">{{.R.StartedAt.Format "2006-01-02 15:04:05 MST"}}</p>
+{{- range .R.Notes}}
+<p class="note" role="note"><strong>Warning:</strong> {{.}}</p>
+{{- end}}
 </header>
 
 <section aria-label="Summary">
