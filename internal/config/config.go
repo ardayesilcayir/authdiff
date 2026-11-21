@@ -180,7 +180,7 @@ func scrubErr(err error, values []string) error {
 
 // Load reads path, expands ${env:X}, decodes, applies defaults and validates.
 func Load(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // G304: operator-supplied or test-only path
 	if err != nil {
 		return nil, fmt.Errorf("read config: %w", err)
 	}

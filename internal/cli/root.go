@@ -69,11 +69,11 @@ func execute(ctx context.Context, args []string, stdout, stderr io.Writer, versi
 	var ce *codeError
 	if errors.As(err, &ce) {
 		if ce.err != nil {
-			fmt.Fprintln(stderr, "Error:", ce.err)
+			_, _ = fmt.Fprintln(stderr, "Error:", ce.err)
 		}
 		return ce.code
 	}
-	fmt.Fprintln(stderr, "Error:", err)
+	_, _ = fmt.Fprintln(stderr, "Error:", err)
 	return exitError
 }
 

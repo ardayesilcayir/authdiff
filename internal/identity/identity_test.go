@@ -22,7 +22,7 @@ func TestApplyAuth(t *testing.T) {
 	r := apply(t, config.Auth{Type: "bearer", Token: "tok"})
 	assert.Equal(t, "Bearer tok", r.Header.Get("Authorization"))
 
-	r = apply(t, config.Auth{Type: "cookie", Token: "sid=abc; x=1"})
+	r = apply(t, config.Auth{Type: "cookie", Token: "sid=abc; x=1"}) //nolint:gosec // G101: test fixture, not a real credential
 	assert.Equal(t, "sid=abc; x=1", r.Header.Get("Cookie"))
 	r = apply(t, config.Auth{Type: "cookie", Name: "sid", Token: "abc"})
 	assert.Equal(t, "sid=abc", r.Header.Get("Cookie"))

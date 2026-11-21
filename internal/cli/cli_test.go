@@ -20,11 +20,11 @@ func TestInitCreatesFiles(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("init exit %d: %s", code, errOut)
 	}
-	cfgData, err := os.ReadFile(filepath.Join(dir, "authdiff.yaml"))
+	cfgData, err := os.ReadFile(filepath.Join(dir, "authdiff.yaml")) //nolint:gosec // G304: operator-supplied or test-only path
 	if err != nil {
 		t.Fatal(err)
 	}
-	ignore, err := os.ReadFile(filepath.Join(dir, ".authdiff-ignore"))
+	ignore, err := os.ReadFile(filepath.Join(dir, ".authdiff-ignore")) //nolint:gosec // G304: operator-supplied or test-only path
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,9 +150,9 @@ func TestRulesValidateBad(t *testing.T) {
 func TestScanRefusesWithoutAck(t *testing.T) {
 	api := newMiniAPI(t)
 	p := writeProject(t, api, "")
-	data, _ := os.ReadFile(p)
+	data, _ := os.ReadFile(p) //nolint:gosec // G304: operator-supplied or test-only path
 	data = []byte(strings.Replace(string(data), "acknowledgeAuthorization: true", "acknowledgeAuthorization: false", 1))
-	if err := os.WriteFile(p, data, 0o600); err != nil {
+	if err := os.WriteFile(p, data, 0o600); err != nil { //nolint:gosec // G703: test-only path under t.TempDir or operator-supplied input
 		t.Fatal(err)
 	}
 	code, _, errOut := run(t, "scan", "-c", p)
@@ -216,7 +216,7 @@ func TestScanWritesOutputs(t *testing.T) {
 		t.Fatalf("exit %d: %s", code, errOut)
 	}
 	for _, name := range []string{"results.json", "results.sarif", "report.html"} {
-		data, err := os.ReadFile(filepath.Join(dir, name))
+		data, err := os.ReadFile(filepath.Join(dir, name)) //nolint:gosec // G304: operator-supplied or test-only path
 		if err != nil {
 			t.Errorf("%s: %v", name, err)
 			continue
@@ -232,7 +232,7 @@ func TestScanWritesOutputs(t *testing.T) {
 			t.Errorf("log contains token")
 		}
 	}
-	f, _ := os.Open(filepath.Join(dir, "results.json"))
+	f, _ := os.Open(filepath.Join(dir, "results.json")) //nolint:gosec // G304: operator-supplied or test-only path
 	defer func() { _ = f.Close() }()
 	res, err := report.ReadJSON(f)
 	if err != nil {
@@ -290,7 +290,7 @@ func TestScanInterrupted(t *testing.T) {
 	p := writeProject(t, api, "")
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	code, _, errOut := runCtx(t, ctx, "scan", "-c", p)
+	code, _, errOut := runCtx(ctx, t, "scan", "-c", p)
 	if code != 2 || !strings.Contains(errOut, "scan interrupted, partial results written") {
 		t.Errorf("exit %d stderr %q", code, errOut)
 	}
@@ -355,9 +355,9 @@ func TestInventory(t *testing.T) {
 func TestInventorySpecURLUsesScope(t *testing.T) {
 	api := newMiniAPI(t)
 	p := writeProject(t, api, "")
-	data, _ := os.ReadFile(p)
+	data, _ := os.ReadFile(p) //nolint:gosec // G304: operator-supplied or test-only path
 	data = []byte(strings.Replace(string(data), "./openapi.yaml", "http://evil.example:9/openapi.yaml", 1))
-	if err := os.WriteFile(p, data, 0o600); err != nil {
+	if err := os.WriteFile(p, data, 0o600); err != nil { //nolint:gosec // G703: operator-supplied or test-only path
 		t.Fatal(err)
 	}
 	code, _, errOut := run(t, "inventory", "-c", p)

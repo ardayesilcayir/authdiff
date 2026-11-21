@@ -36,7 +36,7 @@ func TestLeakKeySegments(t *testing.T) {
 
 // Harvest rules for endpoints outside the filtered inventory are not sent.
 func TestHarvestHonoursFilter(t *testing.T) {
-	api := newAPI(t, func(w http.ResponseWriter, r *http.Request, user string) {
+	api := newAPI(t, func(w http.ResponseWriter, _ *http.Request, _ string) {
 		writeJSON(w, http.StatusOK, map[string]any{"items": []any{}})
 	})
 	cfg := testConfig(api.URL)

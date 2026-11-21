@@ -91,7 +91,7 @@ func TestURLSecretsNotLeaked(t *testing.T) {
 	assertNoSecret(t, "stdout", out)
 	assertNoSecret(t, "stderr", errOut)
 	for _, name := range []string{"results.json", "results.sarif", "report.html"} {
-		data, err := os.ReadFile(filepath.Join(dir, name))
+		data, err := os.ReadFile(filepath.Join(dir, name)) //nolint:gosec // G304: operator-supplied or test-only path
 		if err != nil {
 			t.Fatal(err)
 		}

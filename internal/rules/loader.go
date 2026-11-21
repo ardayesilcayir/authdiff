@@ -220,7 +220,7 @@ func parse(data []byte, source string) (Rule, error) {
 
 // LoadFile loads and validates one rule file.
 func LoadFile(path string) (Rule, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // G304: rule path is operator-supplied
 	if err != nil {
 		return Rule{}, fmt.Errorf("read rule %s: %w", path, err)
 	}

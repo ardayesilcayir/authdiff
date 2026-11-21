@@ -126,7 +126,7 @@ func step(status int, body string) StepEnv {
 func TestEvalBOLA(t *testing.T) {
 	r := builtin(t, "AD-BOLA-001")
 	fn := Funcs{
-		Similarity:    func(a, b string) float64 { return 1.0 },
+		Similarity:    func(_, _ string) float64 { return 1.0 },
 		Evidence:      func(string, []string) bool { return true },
 		MatrixForbids: func(string) bool { return false },
 	}
@@ -158,7 +158,7 @@ func TestEvalBOLA(t *testing.T) {
 
 func TestEvalNoAuthAndBFLA(t *testing.T) {
 	fn := Funcs{
-		Similarity:    func(a, b string) float64 { return 0 },
+		Similarity:    func(_, _ string) float64 { return 0 },
 		Evidence:      func(string, []string) bool { return false },
 		MatrixForbids: func(s string) bool { return s == "anon" },
 	}

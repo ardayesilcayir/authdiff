@@ -24,9 +24,9 @@ func (a *app) rulesCmd() *cobra.Command {
 				return err
 			}
 			tw := tabwriter.NewWriter(a.stdout, 0, 4, 2, ' ', 0)
-			fmt.Fprintln(tw, "ID\tSEVERITY\tOWASP\tNAME")
+			_, _ = fmt.Fprintln(tw, "ID\tSEVERITY\tOWASP\tNAME")
 			for _, r := range rs {
-				fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", r.ID, r.Severity, r.OWASP, r.Name)
+				_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", r.ID, r.Severity, r.OWASP, r.Name)
 			}
 			return tw.Flush()
 		},

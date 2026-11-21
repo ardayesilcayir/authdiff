@@ -37,7 +37,7 @@ func TestWritePermissionsAndSymlink(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "symlink") {
 		t.Errorf("symlink not refused: %v", err)
 	}
-	if data, _ := os.ReadFile(target); string(data) != "keep" {
+	if data, _ := os.ReadFile(target); string(data) != "keep" { //nolint:gosec // G304: test-only path under t.TempDir or operator-supplied input
 		t.Error("symlink target overwritten")
 	}
 }

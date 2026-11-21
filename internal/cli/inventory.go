@@ -63,9 +63,9 @@ func (a *app) inventoryCmd() *cobra.Command {
 				return enc.Encode(views)
 			}
 			tw := tabwriter.NewWriter(a.stdout, 0, 4, 2, ' ', 0)
-			fmt.Fprintln(tw, "METHOD\tPATH\tOPERATION\tSECURED\tPARAMS")
+			_, _ = fmt.Fprintln(tw, "METHOD\tPATH\tOPERATION\tSECURED\tPARAMS")
 			for _, v := range views {
-				fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", clean(v.Method), clean(v.Path), clean(dash(v.OperationID)),
+				_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", clean(v.Method), clean(v.Path), clean(dash(v.OperationID)),
 					yesNo(v.Secured), clean(paramList(v.Params)))
 			}
 			return tw.Flush()

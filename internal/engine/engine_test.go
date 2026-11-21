@@ -417,7 +417,7 @@ func TestDryRunNoNetwork(t *testing.T) {
 			first[p.Endpoint] = i
 		}
 	}
-	if !(first["GET /orders/{id}"] < first["PATCH /orders/{id}"] && first["PATCH /orders/{id}"] < first["DELETE /orders/{id}"]) {
+	if first["GET /orders/{id}"] >= first["PATCH /orders/{id}"] || first["PATCH /orders/{id}"] >= first["DELETE /orders/{id}"] {
 		t.Errorf("plan not in phase order: %v", first)
 	}
 	// the admin step of BFLA with skipDestructive is never planned for DELETE.

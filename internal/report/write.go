@@ -52,7 +52,7 @@ func writeFile(p string, fn func(io.Writer, *finding.Result) error, r *finding.R
 	if fi, lerr := os.Lstat(p); lerr == nil && fi.Mode()&os.ModeSymlink != 0 {
 		return fmt.Errorf("create %s: refusing to write through a symlink", p)
 	}
-	out, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	out, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600) //nolint:gosec // G304: report path is operator-supplied; file is created 0600
 	if err != nil {
 		return fmt.Errorf("create %s: %w", p, err)
 	}

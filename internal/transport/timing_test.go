@@ -45,7 +45,7 @@ func TestRateLimitWaitNotCountedInTimeout(t *testing.T) {
 
 // The per-attempt timeout still applies to a slow server.
 func TestTimeoutStillApplies(t *testing.T) {
-	srv, _ := newCounted(t, func(w http.ResponseWriter, r *http.Request) {
+	srv, _ := newCounted(t, func(_ http.ResponseWriter, r *http.Request) {
 		select {
 		case <-r.Context().Done():
 		case <-time.After(2 * time.Second):

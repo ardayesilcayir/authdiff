@@ -36,7 +36,7 @@ func TestNOAUTHRefNeverDestructive(t *testing.T) {
 		t.Errorf("anonymous DELETE probe missing: %+v", plan)
 	}
 
-	api := newAPI(t, func(w http.ResponseWriter, r *http.Request, user string) {
+	api := newAPI(t, func(w http.ResponseWriter, _ *http.Request, _ string) {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	})
 	cfg = testConfig(api.URL)
@@ -53,7 +53,7 @@ func TestNOAUTHRefNeverDestructive(t *testing.T) {
 // sent (nor planned): it would hit an arbitrary object.
 func TestDestructiveUnownedIDsSkipped(t *testing.T) {
 	ep := spec.Endpoint{Method: "DELETE", Path: "/things/{thingId}", Secured: true, Params: []spec.Param{pathParam("thingId")}}
-	api := newAPI(t, func(w http.ResponseWriter, r *http.Request, _ string) {
+	api := newAPI(t, func(w http.ResponseWriter, _ *http.Request, _ string) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 	cfg := testConfig(api.URL)

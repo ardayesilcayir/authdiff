@@ -55,7 +55,7 @@ func (a *app) initCmd() *cobra.Command {
 				if err := os.Chmod(p, f.perm); err != nil { // --force keeps the old mode otherwise
 					return err
 				}
-				fmt.Fprintln(a.stdout, "created", p)
+				_, _ = fmt.Fprintln(a.stdout, "created", p)
 			}
 			return nil
 		},

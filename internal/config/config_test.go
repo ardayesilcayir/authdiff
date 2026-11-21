@@ -134,7 +134,7 @@ func TestValidateOK(t *testing.T) {
 
 func TestValidateNamelessCookieAndApikey(t *testing.T) {
 	c := validConfig()
-	c.Profiles["alice"] = Profile{Auth: Auth{Type: "cookie", Token: "session=abc; csrf=xyz"}}
+	c.Profiles["alice"] = Profile{Auth: Auth{Type: "cookie", Token: "session=abc; csrf=xyz"}} //nolint:gosec // G101: test fixture, not a real credential
 	c.Profiles["bob"] = Profile{Auth: Auth{Type: "apikey", Token: "k"}}
 	require.NoError(t, Validate(c))
 }

@@ -66,9 +66,9 @@ func golden(t *testing.T, name string, got []byte) {
 	t.Helper()
 	p := filepath.Join("testdata", name)
 	if *update {
-		require.NoError(t, os.WriteFile(p, []byte(norm(got)), 0o644))
+		require.NoError(t, os.WriteFile(p, []byte(norm(got)), 0o644)) //nolint:gosec // G306: test-only path under t.TempDir or operator-supplied input
 	}
-	want, err := os.ReadFile(p)
+	want, err := os.ReadFile(p) //nolint:gosec // G304: test-only path under t.TempDir or operator-supplied input
 	require.NoError(t, err)
 	assert.Equal(t, norm(want), norm(got))
 }

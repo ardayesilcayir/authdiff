@@ -53,7 +53,7 @@ func Load(ctx context.Context, src string, client *http.Client) (*Inventory, err
 
 func readSource(ctx context.Context, src string, client *http.Client) ([]byte, error) {
 	if !strings.HasPrefix(src, "http://") && !strings.HasPrefix(src, "https://") {
-		f, err := os.Open(src)
+		f, err := os.Open(src) //nolint:gosec // G304: the spec path is an operator-supplied CLI/config input
 		if err != nil {
 			return nil, fmt.Errorf("read spec: %w", err)
 		}

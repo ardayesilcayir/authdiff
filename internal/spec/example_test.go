@@ -8,9 +8,9 @@ import (
 )
 
 func TestExample(t *testing.T) {
-	min := 5.0
+	lo := 5.0
 	intMin := openapi3.NewIntegerSchema()
-	intMin.Min = &min
+	intMin.Min = &lo
 
 	withExample := openapi3.NewStringSchema()
 	withExample.Example = "hello"

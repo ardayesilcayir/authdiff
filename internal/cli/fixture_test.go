@@ -142,10 +142,10 @@ output: { formats: [json], dir: "%s" }
 // run executes the CLI with args and returns the exit code and output.
 func run(t *testing.T, args ...string) (int, string, string) {
 	t.Helper()
-	return runCtx(t, context.Background(), args...)
+	return runCtx(context.Background(), t, args...)
 }
 
-func runCtx(t *testing.T, ctx context.Context, args ...string) (int, string, string) {
+func runCtx(ctx context.Context, t *testing.T, args ...string) (int, string, string) {
 	t.Helper()
 	var out, errb bytes.Buffer
 	code := execute(ctx, args, &out, &errb, "1.2.3", "abc123", "2026-11-20")
@@ -157,7 +157,7 @@ func outDir(cfgPath string) string { return filepath.Join(filepath.Dir(cfgPath),
 // editConfig applies old->new replacements to the config file at p.
 func editConfig(t *testing.T, p string, pairs ...string) {
 	t.Helper()
-	data, err := os.ReadFile(p)
+	data, err := os.ReadFile(p) //nolint:gosec // G304: operator-supplied or test-only path
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +168,7 @@ func editConfig(t *testing.T, p string, pairs ...string) {
 		}
 		s = strings.Replace(s, pairs[i], pairs[i+1], 1)
 	}
-	if err := os.WriteFile(p, []byte(s), 0o600); err != nil {
+	if err := os.WriteFile(p, []byte(s), 0o600); err != nil { //nolint:gosec // G703: operator-supplied or test-only path
 		t.Fatal(err)
 	}
 }

@@ -229,7 +229,7 @@ func TestRetryDelay(t *testing.T) {
 
 func TestClientUserAgent(t *testing.T) {
 	srv, _ := newCounted(t, func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(r.Header.Get("User-Agent")))
+		_, _ = w.Write([]byte(r.Header.Get("User-Agent"))) //nolint:gosec // G705: test server echoing into a test client
 	})
 	c := newClient(t, Options{AllowHosts: []string{hostOf(srv)}, UserAgent: "authdiff/9.9 (+https://example.test)"})
 	resp, err := c.Do(context.Background(), mustReq(t, "GET", srv.URL, ""))
@@ -312,7 +312,7 @@ func TestClientAppliesRateLimit(t *testing.T) {
 
 const (
 	secBearer = "tok-ALICE-0123456789"
-	secAPIKey = "key-APIKEY-9876543210"
+	secAPIKey = "key-APIKEY-9876543210" //nolint:gosec // G101: test fixture, not a real credential
 	secBody   = "pw-BODYSECRET-555555"
 	secCookie = "COOKIEVALUE12345"
 	secSetCk  = "SETCOOKIEVALUE777"
@@ -322,7 +322,7 @@ func secretHandler(w http.ResponseWriter, r *http.Request) {
 	b, _ := io.ReadAll(r.Body)
 	w.Header().Set("Location", "http://"+r.Host+"/cb?token="+secBearer)
 	w.Header().Add("Set-Cookie", "sid="+secSetCk+"; Path=/")
-	_, _ = fmt.Fprintf(w, `{"body":%q,"auth":%q,"url":%q}`, b, r.Header.Get("Authorization"), r.URL.String())
+	_, _ = fmt.Fprintf(w, `{"body":%q,"auth":%q,"url":%q}`, b, r.Header.Get("Authorization"), r.URL.String()) //nolint:gosec // G705: test server echoing into a test client
 }
 
 func TestExchangeNeverContainsSecret(t *testing.T) {

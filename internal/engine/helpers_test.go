@@ -67,7 +67,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-func requestID() string { return fmt.Sprintf("req-%d", rand.Int63()) }
+func requestID() string { return fmt.Sprintf("req-%d", rand.Int63()) } //nolint:gosec // G404: deterministic test data, not security-sensitive
 
 // testConfig has alice and bob (role user, each owning an order), an admin and
 // an anonymous profile.

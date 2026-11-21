@@ -32,7 +32,7 @@ func TestRedactEncodedVariants(t *testing.T) {
 	assert.NotContains(t, out, "w%2F")
 	assert.Equal(t, 3, strings.Count(out, "****1234"))
 
-	jsonSecret := `a"b<c>d-secret`
+	jsonSecret := `a"b<c>d-secret` //nolint:gosec // G101: test fixture, not a real credential
 	for _, in := range []string{`{"k":"a\"b<c>d-secret"}`, `{"k":"a\"b<c>d-secret"}`} {
 		out = Redact(in, []string{jsonSecret})
 		assert.NotContains(t, out, "secret", in)
