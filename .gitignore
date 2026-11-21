@@ -7,3 +7,5 @@ __pycache__/
 coverage.out
 vuln-lab/openapi.json
 examples/authdiff.ci.yaml
+/authdiff
+/authdiff.exe
