@@ -324,18 +324,24 @@ func sortedKeys(set map[string]struct{}) []string {
 }
 
 // isSecured reports whether the operation (or, absent an operation-level
-// override, the document) declares at least one non-empty security requirement.
+// override, the document) requires authentication: at least one security
+// requirement and none of them empty. An empty requirement object ({}) is an
+// alternative that needs no credentials, so `[{bearer: []}, {}]` is
+// optional authentication.
 func isSecured(doc *openapi3.T, op *openapi3.Operation) bool {
 	reqs := doc.Security
 	if op.Security != nil {
 		reqs = *op.Security
 	}
+	if len(reqs) == 0 {
+		return false
+	}
 	for _, r := range reqs {
-		if len(r) > 0 {
-			return true
+		if len(r) == 0 {
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 // normalize parses a JSON or YAML document and rewrites OpenAPI 3.1 constructs

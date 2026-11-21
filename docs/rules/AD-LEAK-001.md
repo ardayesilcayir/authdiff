@@ -18,9 +18,15 @@ schema does not declare. Example: `GET /users/{userId}` returns the user's
 
 1. Each `GET` endpoint is called once by a logged-in profile (`any_user`).
 2. The JSON response is flattened into leaf paths (`$.items[0].passwordHash`).
-3. A key is reported when its name matches
-   `password|passwd|secret|token|apikey|api_key|ssn|hash` (case-insensitive)
-   **and** the operation's response schema does not declare it.
+3. The key is split into lower-case word segments (camelCase, snake_case
+   and kebab-case: `passwordHash` -> `password`, `hash`; `x-api-key` -> `x`,
+   `api`, `key`). It is reported when a segment is one of `password`,
+   `passwd`, `secret`, `token`, `apikey`, `ssn`, `hash` (or two adjacent
+   segments are `api` + `key`) **and** the operation's response schema does
+   not declare it. Substrings do not count, so `businessName` and `hashtag`
+   are not reported; a `token` key that also has a `type`, `count`, `page`,
+   `next`, `expires` or `expiry` segment (`tokenType`, `nextPageToken`,
+   `tokenExpiresAt`) is metadata, not a secret, and is not reported either.
 
 Declared fields are treated as intentional (for example the `token` returned
 by a login endpoint).

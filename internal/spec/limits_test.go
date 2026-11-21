@@ -61,3 +61,37 @@ func TestFindLineIndex(t *testing.T) {
 	assert.Equal(t, 3, lineIndex([]byte(jsonSrc))["/a"])
 	assert.Equal(t, 1, lineIndex([]byte(`{"/z": {}}`))["/z"])
 }
+
+// security: [{bearer: []}, {}] makes authentication optional.
+func TestOptionalSecurityIsNotSecured(t *testing.T) {
+	const doc = `openapi: 3.0.3
+info: {title: o, version: "1"}
+security:
+  - bearer: []
+paths:
+  /opt:
+    get:
+      security:
+        - bearer: []
+        - {}
+      responses: {"200": {description: ok}}
+  /req:
+    get:
+      responses: {"200": {description: ok}}
+components:
+  securitySchemes:
+    bearer: {type: http, scheme: bearer}
+`
+	p := filepath.Join(t.TempDir(), "o.yaml")
+	require.NoError(t, os.WriteFile(p, []byte(doc), 0o600))
+	inv, err := Load(context.Background(), p, nil)
+	require.NoError(t, err)
+	for _, e := range inv.Endpoints {
+		switch e.Path {
+		case "/opt":
+			assert.False(t, e.Secured, "optional auth")
+		case "/req":
+			assert.True(t, e.Secured)
+		}
+	}
+}

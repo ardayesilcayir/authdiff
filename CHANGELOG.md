@@ -72,6 +72,13 @@ follows [Semantic Versioning](https://semver.org/).
   error instead of reporting "No findings."; the terminal summary and HTML
   report show blocked requests and errors, and every authenticated profile
   that never got a `2xx` is logged as a warning.
+- `security: [{bearer: []}, {}]` (optional authentication) is no longer
+  treated as secured, avoiding AD-NOAUTH-001 false positives.
+- Harvest requests honour `--include` / `--exclude` / `--tag`: harvest rules
+  for endpoints outside the filtered inventory are skipped.
+- AD-LEAK-001 matches whole word segments of a key instead of substrings
+  (`businessName`, `hashtag`, `tokenType`, `nextPageToken` are no longer
+  reported; `passwordHash` still is).
 - Waiting for the rate limiter no longer counts against `safety.timeout`, so
   low `--rate` values do not cause spurious timeouts; blocked requests never
   consume a rate-limit token.

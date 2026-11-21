@@ -241,8 +241,9 @@ func DryRun(o RunOptions) ([]PlannedRequest, error) {
 }
 
 // harvest runs the config's harvest rules as every non-anonymous profile and
-// adds the extracted IDs to that profile's pool. Destructive methods are
-// never used; failures are logged and skipped.
+// adds the extracted IDs to that profile's pool. Destructive methods and
+// endpoints outside the filtered inventory are never used; failures are
+// logged and skipped.
 func harvest(ctx context.Context, env *Env, inv *spec.Inventory) error {
 	log := env.logger()
 	for _, h := range env.Config.Harvest {
@@ -254,12 +255,18 @@ func harvest(ctx context.Context, env *Env, inv *spec.Inventory) error {
 			log.Warn("harvest: skipping destructive endpoint", "endpoint", h.Endpoint)
 			continue
 		}
-		ep := spec.Endpoint{Method: method, Path: path}
+		ep, found := spec.Endpoint{}, false
 		for _, e := range inv.Endpoints {
 			if e.Method == method && e.Path == path {
-				ep = e
+				ep, found = e, true
 				break
 			}
+		}
+		if !found {
+			// Outside the (filtered) inventory: --include/--exclude/--tag
+			// apply to harvest requests too.
+			log.Info("harvest: endpoint not in the filtered inventory, skipping", "endpoint", h.Endpoint)
+			continue
 		}
 		for _, p := range sortedProfiles(env.Profiles) {
 			if p.IsAnonymous() {

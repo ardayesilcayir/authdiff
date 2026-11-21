@@ -170,8 +170,10 @@ harvest:
     extract: { orderId: "$.items[*].id" }  # path parameter name -> JSONPath
 ```
 
-Failures are logged and skipped. `--dry-run` does not run harvest, so its plan
-only uses configured `owns`.
+Failures are logged and skipped. A harvest endpoint must be in the inventory
+after `filter` / `--include` / `--exclude` / `--tag`; otherwise it is skipped,
+so filters also limit harvest traffic. `--dry-run` does not run harvest, so
+its plan only uses configured `owns`.
 
 ## `matrix`
 

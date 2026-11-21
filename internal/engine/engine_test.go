@@ -358,7 +358,8 @@ func TestHarvest(t *testing.T) {
 		{Endpoint: "GET /me/orders", Extract: map[string]string{"id": "$.items[*].id"}},
 		{Endpoint: "DELETE /me/orders", Extract: map[string]string{"id": "$.id"}}, // destructive: ignored
 	}
-	res := runScan(t, api, cfg, []spec.Endpoint{epGetOrder}, templateRules(t, RuleBOLARead))
+	epMeOrders := spec.Endpoint{Method: "GET", Path: "/me/orders", Secured: true}
+	res := runScan(t, api, cfg, []spec.Endpoint{epGetOrder, epMeOrders}, templateRules(t, RuleBOLARead))
 
 	var bobUsed bool
 	for _, h := range api.Hits() {

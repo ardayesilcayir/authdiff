@@ -24,7 +24,9 @@ any user's profile to anyone.
 2. **Anonymous request**: the same request without credentials.
 3. **Decision**: the anonymous request gets a 2xx **and** at least one of the
    following holds:
-   - the operation declares `security` in the OpenAPI spec,
+   - the operation declares `security` in the OpenAPI spec (a requirement
+     list that contains an empty object, such as `[{bearer: []}, {}]`, means
+     authentication is optional and does not count),
    - the `matrix` does not allow anonymous access to it,
    - the anonymous response contains a profile's identifiers (user ID,
      e-mail).
