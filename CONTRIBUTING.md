@@ -80,3 +80,14 @@ Always recreate it before an e2e run (`make e2e` does this for you).
 
 By contributing you agree that your contribution is licensed under the
 [MIT License](LICENSE).
+
+## Releasing (maintainers)
+
+1. Move the `[Unreleased]` entries in `CHANGELOG.md` under a new
+   `## [X.Y.Z] - YYYY-MM-DD` heading and commit.
+2. Tag and push the full version; this triggers the release workflow
+   (GoReleaser binaries, checksums, GHCR image):
+   `git tag -a vX.Y.Z -m "authdiff vX.Y.Z" && git push origin vX.Y.Z`
+3. Move the major tag used by the GitHub Action to the same commit. Only
+   full `vX.Y.Z` tags trigger a release, so this does not publish anything:
+   `git tag -fa v1 vX.Y.Z^{} -m "authdiff Action v1 -> vX.Y.Z" && git push -f origin v1`
