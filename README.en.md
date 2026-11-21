@@ -15,15 +15,7 @@ JSON, SARIF and HTML.
 
 [Türkçe README](README.md)
 
-```
-SEVERITY  RULE           ENDPOINT                       ATTACKER→VICTIM  CONF
-────────  ─────────────  ─────────────────────────────  ───────────────  ──────
-HIGH      AD-BFLA-001    GET /admin/users               alice→admin      high
-HIGH      AD-BOLA-001    GET /invoices/{invoiceId}/pdf  bob→alice        high
-HIGH      AD-BOLA-001    GET /orders/{orderId}          bob→alice        high
-HIGH      AD-NOAUTH-001  GET /users/{userId}/profile    anonymous→admin  high
-MEDIUM    AD-LEAK-001    GET /users/{userId}            admin→admin      medium
-```
+![authdiff demo: version, inventory and scan output against the lab](docs/assets/demo.gif)
 
 ## Why
 
@@ -38,7 +30,7 @@ spec. The three authorization classes it targets are API1 (BOLA), API3
 
 ## Quick start: first results in 5 minutes
 
-You need Go 1.23+ and Docker. The bundled [vuln-lab](vuln-lab/) is a small,
+You need Go 1.26+ and Docker. The bundled [vuln-lab](vuln-lab/) is a small,
 deliberately vulnerable shop API that runs on `127.0.0.1:8000` only.
 
 ```sh
@@ -174,7 +166,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ardayesilcayir/authdiff/action@v1
+      - uses: ardayesilcayir/authdiff/action@v1   # moving major tag; pin @v1.0.0 for an exact release
         with:
           config: authdiff.yaml      # required
           version: v1.0.0            # default: latest; pin a tag for reproducible CI
@@ -242,6 +234,7 @@ For bug bounty programs, read the program's scope and rules first, use a low
 - [Writing rules](docs/writing-rules.md)
 - [Rule reference](docs/rules/): what each rule finds, how it works, how to fix it
 - [Architecture](docs/architecture.md) and decisions: [ADR-0001 Go](docs/adr/0001-go-secimi.md), [ADR-0002 comparison algorithm](docs/adr/0002-karsilastirma-algoritmasi.md)
+- [Benchmarks / Karşılaştırma](docs/benchmarks.md): how authdiff compares with other tools
 - [vuln-lab](vuln-lab/README.md) and its [expected findings](vuln-lab/VULNERABILITIES.md)
 
 ## Development

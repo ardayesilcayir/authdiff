@@ -15,15 +15,7 @@ olarak raporlar.
 
 [English README](README.en.md)
 
-```
-SEVERITY  RULE           ENDPOINT                       ATTACKER→VICTIM  CONF
-────────  ─────────────  ─────────────────────────────  ───────────────  ──────
-HIGH      AD-BFLA-001    GET /admin/users               alice→admin      high
-HIGH      AD-BOLA-001    GET /invoices/{invoiceId}/pdf  bob→alice        high
-HIGH      AD-BOLA-001    GET /orders/{orderId}          bob→alice        high
-HIGH      AD-NOAUTH-001  GET /users/{userId}/profile    anonymous→admin  high
-MEDIUM    AD-LEAK-001    GET /users/{userId}            admin→admin      medium
-```
+![authdiff demo: lab'a karşı version, inventory ve scan çıktısı](docs/assets/demo.gif)
 
 ## Neden
 
@@ -39,7 +31,7 @@ yetki) ve API5'tir (BFLA).
 
 ## Hızlı başlangıç: 5 dakikada ilk sonuç
 
-Go 1.23+ ve Docker gerekir. Depodaki [vuln-lab](vuln-lab/), yalnızca
+Go 1.26+ ve Docker gerekir. Depodaki [vuln-lab](vuln-lab/), yalnızca
 `127.0.0.1:8000` üzerinde çalışan, bilerek açıklı bırakılmış küçük bir
 e-ticaret API'sidir.
 
@@ -177,7 +169,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ardayesilcayir/authdiff/action@v1
+      - uses: ardayesilcayir/authdiff/action@v1   # hareketli major tag; tam sabitleme için @v1.0.0
         with:
           config: authdiff.yaml      # zorunlu
           version: v1.0.0            # varsayılan: latest; tekrarlanabilir CI için bir tag sabitleyin
@@ -249,6 +241,7 @@ Dokümantasyon İngilizcedir:
 - [Kural yazma](docs/writing-rules.md)
 - [Kural başvurusu](docs/rules/): her kural ne bulur, nasıl çalışır, nasıl düzeltilir
 - [Mimari](docs/architecture.md) ve kararlar: [ADR-0001 Go](docs/adr/0001-go-secimi.md), [ADR-0002 karşılaştırma algoritması](docs/adr/0002-karsilastirma-algoritmasi.md)
+- [Karşılaştırma / Benchmarks](docs/benchmarks.md): authdiff'in diğer araçlarla karşılaştırması
 - [vuln-lab](vuln-lab/README.md) ve [beklenen bulguları](vuln-lab/VULNERABILITIES.md)
 
 ## Geliştirme

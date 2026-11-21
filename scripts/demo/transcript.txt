@@ -1,0 +1,36 @@
+$ authdiff version
+authdiff 1.0.0 (commit 3892dd6, built unknown)
+
+$ authdiff inventory -c examples/authdiff.yaml
+METHOD  PATH                       OPERATION                                 SECURED  PARAMS
+GET     /admin/stats               stats_admin_stats_get                     yes      -
+GET     /admin/users               list_users_admin_users_get                yes      -
+DELETE  /admin/users/{userId}      delete_user_admin_users__userId__delete   yes      userId(path)
+GET     /invoices/{invoiceId}/pdf  invoice_pdf_invoices__invoiceId__pdf_get  yes      invoiceId(path)
+GET     /me                        me_me_get                                 yes      -
+GET     /me/orders                 my_orders_me_orders_get                   yes      -
+POST    /orders                    create_order_orders_post                  yes      -
+GET     /orders/{orderId}          get_order_orders__orderId__get            yes      orderId(path)
+PATCH   /orders/{orderId}          patch_order_orders__orderId__patch        yes      orderId(path)
+GET     /orders/{orderId}/status   order_status_orders__orderId__status_get  yes      orderId(path)
+...
+
+$ authdiff scan -c examples/authdiff.yaml --allow-destructive --no-color
+SEVERITY  RULE           ENDPOINT                       ATTACKER→VICTIM  CONF
+────────  ─────────────  ─────────────────────────────  ───────────────  ──────
+HIGH      AD-BFLA-001    DELETE /admin/users/{userId}   alice→admin      medium
+HIGH      AD-BFLA-001    DELETE /admin/users/{userId}   bob→admin        medium
+HIGH      AD-BFLA-001    GET /admin/users               alice→admin      high
+HIGH      AD-BFLA-001    GET /admin/users               bob→admin        high
+HIGH      AD-BOLA-001    GET /invoices/{invoiceId}/pdf  bob→alice        high
+HIGH      AD-BOLA-001    GET /invoices/{invoiceId}/pdf  alice→bob        high
+HIGH      AD-BOLA-001    GET /orders/{orderId}          bob→alice        high
+HIGH      AD-BOLA-001    GET /orders/{orderId}          alice→bob        high
+HIGH      AD-BOLA-002    PATCH /orders/{orderId}        bob→alice        high
+HIGH      AD-BOLA-002    PATCH /orders/{orderId}        alice→bob        high
+HIGH      AD-MASS-001    PUT /users/me                  alice→alice      high
+HIGH      AD-MASS-001    PUT /users/me                  bob→bob          high
+HIGH      AD-NOAUTH-001  GET /users/{userId}/profile    anonymous→admin  high
+MEDIUM    AD-LEAK-001    GET /users/{userId}            admin→admin      medium
+
+14 findings (0 suppressed) · 168 requests · 0 blocked · 0 errors · 33.47s
