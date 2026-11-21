@@ -68,10 +68,6 @@ func UserAgent(version string) string {
 	return "authdiff/" + version + " (+https://github.com/ardayesilcayir/authdiff)"
 }
 
-func isURL(s string) bool {
-	return strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://")
-}
-
 // LoadConfig loads the config file (env expansion and defaults), resolves the
 // spec path and rules.dirs relative to the config file's directory, applies
 // o and validates the result.
@@ -81,6 +77,7 @@ func LoadConfig(path string, o Overrides) (*config.Config, error) {
 		return nil, err
 	}
 	base := filepath.Dir(path)
+	cfg.Target.Spec = lowerScheme(cfg.Target.Spec)
 	if s := cfg.Target.Spec; !isURL(s) && !filepath.IsAbs(s) {
 		cfg.Target.Spec = filepath.Join(base, s)
 	}
@@ -91,7 +88,7 @@ func LoadConfig(path string, o Overrides) (*config.Config, error) {
 	}
 	applyOverrides(cfg, o)
 	if err := config.Validate(cfg); err != nil {
-		return nil, err
+		return nil, newScrubber(cfg).Err(err)
 	}
 	return cfg, nil
 }
@@ -189,21 +186,22 @@ func newClient(cfg *config.Config, version string) (*transport.Client, error) {
 		MaxResponseBytes: cfg.Safety.MaxResponseBytes,
 		Insecure:         cfg.Safety.Insecure,
 		UserAgent:        UserAgent(version),
-		Secrets:          cfg.Secrets(),
+		Secrets:          append(cfg.Secrets(), urlSecrets(cfg, false)...),
 		Retries:          maxRetries,
 	})
 }
 
 // loadInventory loads and filters the spec of cfg. A URL spec is downloaded
 // through client (so scope and safe mode apply); client may be nil for files.
-func loadInventory(ctx context.Context, cfg *config.Config, client *transport.Client) (*spec.Inventory, error) {
+// Errors have URL secrets masked.
+func loadInventory(ctx context.Context, cfg *config.Config, client *transport.Client, version string) (*spec.Inventory, error) {
 	var hc *http.Client
 	if client != nil {
-		hc = client.HTTP()
+		hc = specHTTP(client, version)
 	}
 	inv, err := spec.Load(ctx, cfg.Target.Spec, hc)
 	if err != nil {
-		return nil, err
+		return nil, newScrubber(cfg).Err(err)
 	}
 	inv = inv.Filter(cfg.Filter.Include, cfg.Filter.Exclude, cfg.Filter.Tags)
 	inv.SpecPath = displaySpecPath(cfg.Target.Spec)
@@ -224,15 +222,15 @@ func LoadInventory(ctx context.Context, path string, o Overrides, version string
 			return nil, err
 		}
 	}
-	return loadInventory(ctx, cfg, client)
+	return loadInventory(ctx, cfg, client, version)
 }
 
-// displaySpecPath is the spec location shown in reports: URLs unchanged,
+// displaySpecPath is the spec location shown in reports: URLs redacted,
 // files relative to the working directory with forward slashes (the base
 // name if no relative path exists).
 func displaySpecPath(src string) string {
 	if isURL(src) {
-		return src
+		return RedactURL(src)
 	}
 	abs, err := filepath.Abs(src)
 	if err != nil {
@@ -277,19 +275,20 @@ func Scan(ctx context.Context, o ScanOptions) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	inv, err := loadInventory(ctx, cfg, client)
+	inv, err := loadInventory(ctx, cfg, client, o.Version)
 	if err != nil {
 		return nil, err
 	}
-	log.Info("scan starting", "target", cfg.Target.BaseURL, "endpoints", len(inv.Endpoints),
+	log.Info("scan starting", "target", RedactURL(cfg.Target.BaseURL), "endpoints", len(inv.Endpoints),
 		"rules", len(rs), "profiles", len(cfg.Profiles))
 	res, runErr := engine.Run(ctx, engine.RunOptions{
 		Config: cfg, Inventory: inv, Rules: rs, Client: client, Log: log, Version: o.Version,
 	})
+	runErr = newScrubber(cfg).Err(runErr)
 	if res == nil {
 		return nil, runErr
 	}
-	res.Target = cfg.Target.BaseURL
+	res.Target = RedactURL(cfg.Target.BaseURL)
 	res.SpecPath = inv.SpecPath
 	res.Findings = baseline.Apply(res.Findings)
 	log.Info("scan finished", "findings", len(res.Findings), "active", len(res.Active()),
@@ -308,9 +307,16 @@ func loadBaseline(path string) (*finding.Baseline, error) {
 	return b, nil
 }
 
-// Plan lists the requests Scan would send, in order, without sending any.
-// Only a URL spec is downloaded (through the scoped transport).
+// Plan is PlanContext with a background context.
 func Plan(o ScanOptions) ([]engine.PlannedRequest, error) {
+	return PlanContext(context.Background(), o)
+}
+
+// PlanContext lists the requests Scan would send, in order, without sending
+// any to the target. Only a URL spec is downloaded (through the scoped
+// transport, cancellable by ctx).
+func PlanContext(ctx context.Context, o ScanOptions) ([]engine.PlannedRequest, error) {
+	log := logger(o.Log)
 	cfg, err := LoadConfig(o.ConfigPath, o.Overrides)
 	if err != nil {
 		return nil, err
@@ -324,10 +330,11 @@ func Plan(o ScanOptions) ([]engine.PlannedRequest, error) {
 		if client, err = newClient(cfg, o.Version); err != nil {
 			return nil, err
 		}
+		log.Info("dry run: downloading spec", "url", RedactURL(cfg.Target.Spec))
 	}
-	inv, err := loadInventory(context.Background(), cfg, client)
+	inv, err := loadInventory(ctx, cfg, client, o.Version)
 	if err != nil {
 		return nil, err
 	}
-	return engine.DryRun(engine.RunOptions{Config: cfg, Inventory: inv, Rules: rs, Log: logger(o.Log), Version: o.Version})
+	return engine.DryRun(engine.RunOptions{Config: cfg, Inventory: inv, Rules: rs, Log: log, Version: o.Version})
 }

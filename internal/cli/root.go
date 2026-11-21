@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
 )
@@ -48,9 +49,9 @@ type app struct {
 }
 
 // Execute runs the CLI with args and returns the process exit code. Ctrl-C
-// cancels the running command.
+// or SIGTERM cancels the running command.
 func Execute(args []string, stdout, stderr io.Writer, version, commit, date string) int {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	return execute(ctx, args, stdout, stderr, version, commit, date)
 }

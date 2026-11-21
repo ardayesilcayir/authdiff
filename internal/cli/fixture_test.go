@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 )
@@ -50,6 +51,16 @@ paths:
 type miniAPI struct {
 	*httptest.Server
 	hits atomic.Int64
+
+	mu    sync.Mutex
+	paths []string // request paths in arrival order
+	uas   []string // User-Agent of each request
+}
+
+func (a *miniAPI) seen() (paths, uas []string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return append([]string(nil), a.paths...), append([]string(nil), a.uas...)
 }
 
 func newMiniAPI(t *testing.T) *miniAPI {
@@ -61,6 +72,15 @@ func newMiniAPI(t *testing.T) *miniAPI {
 	api := &miniAPI{}
 	api.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		api.hits.Add(1)
+		api.mu.Lock()
+		api.paths = append(api.paths, r.URL.Path)
+		api.uas = append(api.uas, r.Header.Get("User-Agent"))
+		api.mu.Unlock()
+		if r.URL.Path == "/openapi.yaml" {
+			w.Header().Set("Content-Type", "application/yaml")
+			_, _ = w.Write([]byte(miniSpec))
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		auth := r.Header.Get("Authorization")
 		if auth != "Bearer "+aliceToken && auth != "Bearer "+bobToken {
@@ -133,3 +153,22 @@ func runCtx(t *testing.T, ctx context.Context, args ...string) (int, string, str
 }
 
 func outDir(cfgPath string) string { return filepath.Join(filepath.Dir(cfgPath), "out") }
+
+// editConfig applies old->new replacements to the config file at p.
+func editConfig(t *testing.T, p string, pairs ...string) {
+	t.Helper()
+	data, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(data)
+	for i := 0; i+1 < len(pairs); i += 2 {
+		if !strings.Contains(s, pairs[i]) {
+			t.Fatalf("config lacks %q", pairs[i])
+		}
+		s = strings.Replace(s, pairs[i], pairs[i+1], 1)
+	}
+	if err := os.WriteFile(p, []byte(s), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}

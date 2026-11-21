@@ -52,7 +52,7 @@ func (a *app) scanCmd() *cobra.Command {
 				ConfigPath: cfgPath, IgnoreFile: ignoreFile, Version: a.version, Overrides: ov, Log: a.log,
 			}
 			if dryRun {
-				return a.dryRun(opts)
+				return a.dryRun(cmd.Context(), opts)
 			}
 			return a.scan(cmd.Context(), opts)
 		},
@@ -71,12 +71,12 @@ func (a *app) scanCmd() *cobra.Command {
 	fl.StringArrayVar(&tags, "tag", nil, "only test operations with this tag (repeatable)")
 	fl.StringArrayVar(&ruleDirs, "rules", nil, "directory of custom rule templates (repeatable)")
 	fl.StringVar(&ignoreFile, "ignore-file", ".authdiff-ignore", "baseline of suppressed finding IDs")
-	fl.BoolVar(&dryRun, "dry-run", false, "print the request plan without sending anything")
+	fl.BoolVar(&dryRun, "dry-run", false, "print the request plan; sends no requests to the target except downloading the spec when target.spec is a URL")
 	return cmd
 }
 
-func (a *app) dryRun(opts authdiff.ScanOptions) error {
-	plan, err := authdiff.Plan(opts)
+func (a *app) dryRun(ctx context.Context, opts authdiff.ScanOptions) error {
+	plan, err := authdiff.PlanContext(ctx, opts)
 	if err != nil {
 		return err
 	}
@@ -92,7 +92,7 @@ func writePlan(a *app, plan []engine.PlannedRequest) error {
 	if err := tw.Flush(); err != nil {
 		return err
 	}
-	a.log.Info("dry run: no requests sent", "planned", len(plan))
+	a.log.Info("dry run: no requests sent to the target", "planned", len(plan))
 	return nil
 }
 
@@ -106,7 +106,7 @@ func (a *app) scan(ctx context.Context, opts authdiff.ScanOptions) error {
 	if err := checkFormats(cfg.Output.Formats); err != nil {
 		return err
 	}
-	a.log.Debug("config loaded", "path", opts.ConfigPath, "target", cfg.Target.BaseURL,
+	a.log.Debug("config loaded", "path", opts.ConfigPath, "target", authdiff.RedactURL(cfg.Target.BaseURL),
 		"profiles", cfg.ProfileNames(), "formats", cfg.Output.Formats, "dir", cfg.Output.Dir,
 		"rate", cfg.Safety.Rate, "concurrency", cfg.Safety.Concurrency,
 		"allowDestructive", cfg.Safety.AllowDestructive)

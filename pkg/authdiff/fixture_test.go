@@ -116,3 +116,16 @@ output: { formats: [json], dir: "%s" }
 	}
 	return p
 }
+
+// cfgSpecURL points target.spec of the config at p to specURL.
+func cfgSpecURL(t *testing.T, p, specURL string) {
+	t.Helper()
+	data, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := strings.Replace(string(data), "./openapi.yaml", `"`+specURL+`"`, 1)
+	if err := os.WriteFile(p, []byte(s), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
