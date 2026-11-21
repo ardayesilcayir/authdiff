@@ -10,7 +10,9 @@ inputs:
     description: Path to the authdiff config file (authdiff.yaml).
     required: true
   version:
-    description: authdiff version to install (a tag such as v1.0.0, or latest).
+    description: >-
+      authdiff version to install: a release tag such as v1.0.0 (recommended,
+      reproducible) or latest (whatever was released last).
     required: false
     default: latest
   fail-on:
@@ -36,13 +38,15 @@ runs:
     - uses: actions/setup-go@v5
       with:
         go-version: stable
+        check-latest: true
         cache: false
 
     - name: Install authdiff
       shell: bash
       env:
         AUTHDIFF_VERSION: ${{ inputs.version }}
-      run: go install "github.com/ardayesilcayir/authdiff/cmd/authdiff@${AUTHDIFF_VERSION}"
+      # The version is stamped into the binary (authdiff version, User-Agent).
+      run: go install -ldflags "-X main.version=${AUTHDIFF_VERSION}" "github.com/ardayesilcayir/authdiff/cmd/authdiff@${AUTHDIFF_VERSION}"
 
     - name: Run authdiff scan
       id: scan

@@ -82,3 +82,13 @@ follows [Semantic Versioning](https://semver.org/).
 - Waiting for the rate limiter no longer counts against `safety.timeout`, so
   low `--rate` values do not cause spurious timeouts; blocked requests never
   consume a rate-limit token.
+
+### CI and packaging
+
+- Workflows and the Action install the latest stable Go (`go-version:
+  stable`, `check-latest: true`); `go.mod` keeps `go 1.23.0` as the minimum.
+- The Action stamps the installed version into the binary with `-ldflags`;
+  pinning a release tag is documented.
+- `examples/workflow.yml` skips pull requests from forks.
+- README: Docker usage with `--user`, `--network host` and
+  `host.docker.internal`.

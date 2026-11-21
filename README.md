@@ -83,8 +83,18 @@ Without Docker: `cd vuln-lab && python -m venv .venv && .venv/bin/pip install -r
 |---|---|
 | Go | `go install github.com/ardayesilcayir/authdiff/cmd/authdiff@latest` |
 | Release binary | Linux, macOS, Windows × amd64, arm64 from [Releases](https://github.com/ardayesilcayir/authdiff/releases), with `checksums.txt` |
-| Docker | `docker run --rm -v "$PWD:/work" -e ALICE_TOKEN ghcr.io/ardayesilcayir/authdiff scan -c authdiff.yaml` |
+| Docker | `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -e ALICE_TOKEN ghcr.io/ardayesilcayir/authdiff scan -c authdiff.yaml` (see [Docker notes](#docker-notes)) |
 | GitHub Action | `uses: ardayesilcayir/authdiff/action@v1` (see [CI usage](#ci-usage)) |
+
+### Docker notes
+
+- `--user "$(id -u):$(id -g)"` makes the reports in the mounted directory
+  belong to you instead of the image's user (the image runs as non-root, which
+  cannot write to a directory it does not own).
+- `localhost` inside the container is the container itself. To scan an API
+  on the host, use `--network host` on Linux (then `localhost:8000` works
+  as-is), or `host.docker.internal` on Docker Desktop (macOS, Windows) and set
+  both `target.baseUrl` and `scope.allowHosts` to `host.docker.internal:8000`.
 
 ## Features
 
@@ -167,7 +177,7 @@ jobs:
       - uses: ardayesilcayir/authdiff/action@v1
         with:
           config: authdiff.yaml      # required
-          version: v1.0.0            # default: latest
+          version: v1.0.0            # default: latest; pin a tag for reproducible CI
           fail-on: high              # default: high
           upload-sarif: "true"       # default: true
         env:
@@ -175,7 +185,8 @@ jobs:
           BOB_TOKEN: ${{ secrets.AUTHDIFF_BOB_TOKEN }}
 ```
 
-A complete workflow is in [examples/workflow.yml](examples/workflow.yml). Use
+A complete workflow is in [examples/workflow.yml](examples/workflow.yml); it
+skips pull requests from forks, which get no secrets. Use
 a spec file from the repository (`target.spec: ./openapi.yaml`) so SARIF
 results point at the operation's line. Point CI at a staging or test
 environment, never at production, and keep destructive checks off unless the

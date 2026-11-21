@@ -20,7 +20,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: stable
+          check-latest: true
 
       # The lab keeps its data in memory and is reseeded on every start.
       # `make e2e` recreates the container, so the test always sees a fresh lab.

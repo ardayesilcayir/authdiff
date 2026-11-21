@@ -85,8 +85,19 @@ Docker olmadan: `cd vuln-lab && python -m venv .venv && .venv/bin/pip install -r
 |---|---|
 | Go | `go install github.com/ardayesilcayir/authdiff/cmd/authdiff@latest` |
 | Release binary | [Releases](https://github.com/ardayesilcayir/authdiff/releases) sayfasından Linux, macOS, Windows × amd64, arm64; `checksums.txt` ile |
-| Docker | `docker run --rm -v "$PWD:/work" -e ALICE_TOKEN ghcr.io/ardayesilcayir/authdiff scan -c authdiff.yaml` |
+| Docker | `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -e ALICE_TOKEN ghcr.io/ardayesilcayir/authdiff scan -c authdiff.yaml` ([Docker notları](#docker-notları)) |
 | GitHub Action | `uses: ardayesilcayir/authdiff/action@v1` ([CI kullanımı](#ci-kullanımı)) |
+
+### Docker notları
+
+- `--user "$(id -u):$(id -g)"` bağlanan dizindeki raporların imajın
+  kullanıcısına değil size ait olmasını sağlar (imaj root olmayan bir
+  kullanıcıyla çalışır ve sahibi olmadığı dizine yazamaz).
+- Konteyner içindeki `localhost` konteynerin kendisidir. Host üzerindeki bir
+  API'yi taramak için Linux'ta `--network host` kullanın (`localhost:8000`
+  olduğu gibi çalışır); Docker Desktop'ta (macOS, Windows) ise
+  `host.docker.internal` kullanın ve hem `target.baseUrl` hem
+  `scope.allowHosts` değerini `host.docker.internal:8000` yapın.
 
 ## Özellikler
 
@@ -169,7 +180,7 @@ jobs:
       - uses: ardayesilcayir/authdiff/action@v1
         with:
           config: authdiff.yaml      # zorunlu
-          version: v1.0.0            # varsayılan: latest
+          version: v1.0.0            # varsayılan: latest; tekrarlanabilir CI için bir tag sabitleyin
           fail-on: high              # varsayılan: high
           upload-sarif: "true"       # varsayılan: true
         env:
@@ -178,7 +189,7 @@ jobs:
 ```
 
 Eksiksiz bir workflow [examples/workflow.yml](examples/workflow.yml)
-dosyasındadır. SARIF sonuçlarının operasyonun satırını göstermesi için
+dosyasındadır; secret almayan fork'lardan gelen pull request'leri atlar. SARIF sonuçlarının operasyonun satırını göstermesi için
 depodaki bir spec dosyasını kullanın (`target.spec: ./openapi.yaml`). CI'ı
 üretime değil, staging veya test ortamına yönlendirin; ortam her çalıştırmadan
 sonra sıfırlanmıyorsa yıkıcı kontrolleri kapalı tutun.

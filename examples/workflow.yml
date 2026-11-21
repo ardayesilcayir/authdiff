@@ -16,6 +16,9 @@ permissions:
 
 jobs:
   authz:
+    # Pull requests from forks get no secrets and a read-only token, so the
+    # scan would test nothing and the SARIF upload would fail: skip them.
+    if: github.event.pull_request.head.repo.fork != true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
