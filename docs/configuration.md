@@ -103,7 +103,7 @@ include the `baseUrl` host.
 | `rate` | `5` | Maximum requests per second, across all workers. CLI: `--rate`. |
 | `concurrency` | `4` | Endpoints tested in parallel. CLI: `--concurrency`. |
 | `allowDestructive` | `false` | `DELETE`, `PUT` and `PATCH` are blocked unless `true`. Blocked requests are counted in the stats. CLI: `--allow-destructive`. Even when `true`, a destructive request is sent only when every path ID belongs to a configured profile (`owns` or harvest); others are skipped. |
-| `timeout` | `10s` | Per-request timeout (Go duration). |
+| `timeout` | `10s` | Per-attempt request timeout (Go duration). Time spent waiting for the rate limiter is not counted. |
 | `maxResponseBytes` | `5242880` (5 MB) | Larger responses are truncated and marked `truncated` in evidence. |
 | `insecure` | `false` | Skip TLS certificate verification. CLI: `--insecure`. |
 
@@ -235,4 +235,4 @@ findings stay in the reports, marked as suppressed, and do not count toward
 |---|---|
 | `0` | Scan finished, no active finding at or above `failOn` |
 | `1` | At least one active finding at or above `failOn` |
-| `2` | Configuration, usage or runtime error |
+| `2` | Configuration, usage or runtime error, or a scan in which no request received an HTTP response (every request blocked or failed: nothing was tested) |

@@ -1,9 +1,12 @@
 package transport
 
 import (
+	"context"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"golang.org/x/time/rate"
 )
@@ -37,17 +40,34 @@ func (r *rateLimit) limiter(host string) *rate.Limiter {
 	return l
 }
 
-func (r *rateLimit) RoundTrip(req *http.Request) (*http.Response, error) {
-	// Same normalization as scope, so equivalent forms of one target share a bucket.
-	host := ""
-	if req.URL != nil {
-		if key, err := requestKey(req.URL); err == nil {
-			host = key
-		} else {
-			host = strings.ToLower(req.URL.Host)
-		}
+// prewaitKey marks a request context whose first hop already took its
+// rate-limit token (Client.do waits before starting the timed attempt). The
+// value is a *atomic.Bool that the first RoundTrip clears, so redirect hops
+// still wait for their own tokens.
+type prewaitKey struct{}
+
+// limitKey is the bucket key of u: the same normalization as scope, so
+// equivalent forms of one target share a bucket.
+func limitKey(u *url.URL) string {
+	if u == nil {
+		return ""
 	}
-	if err := r.limiter(host).Wait(req.Context()); err != nil {
+	if key, err := requestKey(u); err == nil {
+		return key
+	}
+	return strings.ToLower(u.Host)
+}
+
+// wait blocks until u's host may send, or ctx is done.
+func (r *rateLimit) wait(ctx context.Context, u *url.URL) error {
+	return r.limiter(limitKey(u)).Wait(ctx)
+}
+
+func (r *rateLimit) RoundTrip(req *http.Request) (*http.Response, error) {
+	if pre, ok := req.Context().Value(prewaitKey{}).(*atomic.Bool); ok && pre.CompareAndSwap(true, false) {
+		return r.next.RoundTrip(req)
+	}
+	if err := r.wait(req.Context(), req.URL); err != nil {
 		closeBody(req)
 		return nil, err
 	}

@@ -56,7 +56,12 @@ type Response struct {
 
 // Client sends requests through the scope -> safe mode -> rate limit -> base chain.
 type Client struct {
-	http      *http.Client
+	http      *http.Client // no overall timeout: Do bounds each attempt itself
+	download  *http.Client // same chain with Options.Timeout, for HTTP()
+	scope     *scopeTransport
+	safe      *safeMode
+	limit     *rateLimit // nil when rate limiting is disabled
+	timeout   time.Duration
 	red       *redactor
 	retries   int
 	maxBytes  int64
@@ -97,19 +102,24 @@ func New(o Options) (*Client, error) {
 	if base == nil {
 		base = newBaseTransport(o.Insecure)
 	}
-	chain := NewScope(o.AllowHosts, NewSafeMode(o.AllowDestructive, NewRateLimit(o.Rate, base)))
+	limited := NewRateLimit(o.Rate, base)
+	limit, _ := limited.(*rateLimit)
+	safe := &safeMode{allowDestructive: o.AllowDestructive, next: limited}
+	scope := newScope(o.AllowHosts, safe)
+	checkRedirect := func(_ *http.Request, via []*http.Request) error {
+		if len(via) > maxRedirects {
+			return errTooManyRedirects
+		}
+		return nil
+	}
 
 	return &Client{
-		http: &http.Client{
-			Transport: chain,
-			Timeout:   o.Timeout,
-			CheckRedirect: func(_ *http.Request, via []*http.Request) error {
-				if len(via) > maxRedirects {
-					return errTooManyRedirects
-				}
-				return nil
-			},
-		},
+		http:      &http.Client{Transport: scope, CheckRedirect: checkRedirect},
+		download:  &http.Client{Transport: scope, CheckRedirect: checkRedirect, Timeout: o.Timeout},
+		scope:     scope,
+		safe:      safe,
+		limit:     limit,
+		timeout:   o.Timeout,
 		red:       newRedactor(o.Secrets),
 		retries:   o.Retries,
 		maxBytes:  o.MaxResponseBytes,
@@ -134,7 +144,7 @@ func newBaseTransport(insecure bool) http.RoundTripper {
 // HTTP returns the underlying http.Client (same chain, so scope, safe mode and
 // rate limit still apply). It is meant for downloading the spec; requests made
 // through it are not counted in Stats and get no retries or redaction.
-func (c *Client) HTTP() *http.Client { return c.http }
+func (c *Client) HTTP() *http.Client { return c.download }
 
 // Stats returns how many Do calls were made, how many were blocked by scope or
 // safe mode, and how many failed with another error.
@@ -188,13 +198,24 @@ func (c *Client) do(ctx context.Context, req *http.Request) (*Response, error) {
 			r.Body, r.GetBody, r.ContentLength = http.NoBody, nil, 0
 		}
 
-		start := time.Now()
-		hr, err := c.http.Do(r)
-		var data []byte
-		var truncated bool
-		if err == nil {
-			data, truncated, err = c.readBody(hr.Body)
+		// Scope and safe mode first: a blocked request neither waits for nor
+		// consumes a rate-limit token.
+		if err := c.scope.check(r.URL); err != nil {
+			return nil, err
 		}
+		if err := c.safe.check(r); err != nil {
+			return nil, err
+		}
+		// The limiter wait uses the caller's context only, so it never counts
+		// against the per-attempt timeout.
+		if c.limit != nil {
+			if err := c.limit.wait(ctx, r.URL); err != nil {
+				return nil, err
+			}
+		}
+
+		start := time.Now()
+		hr, data, truncated, err := c.attempt(ctx, r)
 		dur := time.Since(start)
 
 		if err != nil {
@@ -222,6 +243,21 @@ func (c *Client) do(ctx context.Context, req *http.Request) (*Response, error) {
 			Exchange:  record(c.red, r, body, hr.StatusCode, hr.Header, data, dur, truncated),
 		}, nil
 	}
+}
+
+// attempt sends r with the per-attempt timeout and reads the body. The first
+// hop's rate-limit token was already taken by the caller.
+func (c *Client) attempt(ctx context.Context, r *http.Request) (*http.Response, []byte, bool, error) {
+	actx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	pre := &atomic.Bool{}
+	pre.Store(c.limit != nil)
+	hr, err := c.http.Do(r.WithContext(context.WithValue(actx, prewaitKey{}, pre)))
+	if err != nil {
+		return nil, nil, false, err
+	}
+	data, truncated, err := c.readBody(hr.Body)
+	return hr, data, truncated, err
 }
 
 // readBody reads at most maxBytes and reports whether the body was longer.

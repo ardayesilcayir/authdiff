@@ -33,17 +33,27 @@ func NewSafeMode(allowDestructive bool, next http.RoundTripper) http.RoundTrippe
 }
 
 func (s *safeMode) RoundTrip(req *http.Request) (*http.Response, error) {
-	if !s.allowDestructive {
-		if m := destructiveIn(req); m != "" {
-			closeBody(req)
-			host := ""
-			if req.URL != nil {
-				host = req.URL.Host
-			}
-			return nil, fmt.Errorf("%w: %s %s", ErrDestructiveBlocked, m, host)
-		}
+	if err := s.check(req); err != nil {
+		closeBody(req)
+		return nil, err
 	}
 	return s.next.RoundTrip(req)
+}
+
+// check returns a wrapped ErrDestructiveBlocked when req would perform a
+// destructive method and destructive methods are not allowed.
+func (s *safeMode) check(req *http.Request) error {
+	if s.allowDestructive {
+		return nil
+	}
+	if m := destructiveIn(req); m != "" {
+		host := ""
+		if req.URL != nil {
+			host = req.URL.Host
+		}
+		return fmt.Errorf("%w: %s %s", ErrDestructiveBlocked, m, host)
+	}
+	return nil
 }
 
 // destructiveIn returns the destructive method the request would perform, or "".

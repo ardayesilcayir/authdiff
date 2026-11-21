@@ -129,6 +129,12 @@ func (a *app) scan(ctx context.Context, opts authdiff.ScanOptions) error {
 		}
 		return scanErr
 	}
+	if responses := res.Stats.Requests - res.Stats.Blocked - res.Stats.Errors; responses <= 0 {
+		return &codeError{code: exitError, err: fmt.Errorf(
+			"no request received an HTTP response (%d requests, %d blocked, %d errors): nothing was tested; "+
+				"check target.baseUrl, scope.allowHosts, the network and safety.timeout",
+			res.Stats.Requests, res.Stats.Blocked, res.Stats.Errors)}
+	}
 	if cfg.Output.FailOn == "" {
 		return nil
 	}

@@ -124,7 +124,10 @@ Common `scan` flags: `--rate 5`, `--concurrency 4`, `--allow-destructive`,
 Global: `-v`, `--log-format json`, `--no-color`.
 
 Exit codes: `0` no active finding at the `--fail-on` threshold, `1` threshold
-reached, `2` error.
+reached, `2` error, including a scan in which no request received an HTTP
+response (nothing was tested). The summary line shows requests, blocked
+requests and errors; a warning names every authenticated profile that never
+got a `2xx` (usually a wrong or expired token).
 
 A minimal config:
 

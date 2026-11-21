@@ -126,7 +126,10 @@ Sık kullanılan `scan` bayrakları: `--rate 5`, `--concurrency 4`,
 `--ignore-file`, `--insecure`. Genel: `-v`, `--log-format json`, `--no-color`.
 
 Çıkış kodları: `0` `--fail-on` eşiğinde aktif bulgu yok, `1` eşik aşıldı,
-`2` hata.
+`2` hata; hiçbir isteğin HTTP yanıtı almadığı (yani hiçbir şeyin test
+edilmediği) taramalar da `2` ile biter. Özet satırı istek, engellenen istek ve
+hata sayılarını gösterir; hiç `2xx` almayan her kimlikli profil için uyarı
+yazılır (genellikle yanlış veya süresi dolmuş token).
 
 En küçük yapılandırma:
 

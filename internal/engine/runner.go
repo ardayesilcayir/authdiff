@@ -113,6 +113,9 @@ func Run(ctx context.Context, o RunOptions) (*finding.Result, error) {
 		if o.Client != nil {
 			res.Stats.Requests, res.Stats.Blocked, res.Stats.Errors = o.Client.Stats()
 		}
+		if runErr == nil {
+			warnNo2xx(env, observations)
+		}
 		return res, runErr
 	}
 
@@ -171,6 +174,24 @@ func Run(ctx context.Context, o RunOptions) (*finding.Result, error) {
 		}
 	}
 	return finish(ctx.Err())
+}
+
+// warnNo2xx logs a warning for every authenticated profile that never got a
+// 2xx response: its credentials are probably invalid or expired, and every
+// check that needed it tested nothing.
+func warnNo2xx(env *Env, obs []Observation) {
+	ok := map[string]bool{}
+	for _, o := range obs {
+		if o.Sent && isOK(o.Status) {
+			ok[o.Profile] = true
+		}
+	}
+	for _, p := range env.Profiles {
+		if !p.IsAnonymous() && !ok[p.Name] {
+			env.logger().Warn("authenticated profile never received a 2xx response; check its credentials and owned IDs",
+				"profile", p.Name)
+		}
+	}
 }
 
 // matrixFindings runs EvaluateMatrix for the first matrix-kind check, if

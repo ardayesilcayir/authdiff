@@ -32,6 +32,10 @@ type scopeTransport struct {
 // shrink the scope, never widen it. Because redirects are re-sent through the
 // transport, they are subject to the same check.
 func NewScope(allowHosts []string, next http.RoundTripper) http.RoundTripper {
+	return newScope(allowHosts, next)
+}
+
+func newScope(allowHosts []string, next http.RoundTripper) *scopeTransport {
 	allowed := make(map[string]struct{})
 	for _, e := range allowHosts {
 		for _, k := range allowKeys(e) {
@@ -42,17 +46,24 @@ func NewScope(allowHosts []string, next http.RoundTripper) http.RoundTripper {
 }
 
 func (s *scopeTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	key, err := requestKey(req.URL)
-	if err != nil {
+	if err := s.check(req.URL); err != nil {
 		closeBody(req)
 		return nil, err
 	}
-	if _, ok := s.allowed[key]; !ok {
-		closeBody(req)
-		// Only host:port is reported; the URL may carry secrets in its query.
-		return nil, fmt.Errorf("%w: %s is not in scope.allowHosts", ErrOutOfScope, key)
-	}
 	return s.next.RoundTrip(req)
+}
+
+// check returns a wrapped ErrOutOfScope unless u's host:port is allowed.
+func (s *scopeTransport) check(u *url.URL) error {
+	key, err := requestKey(u)
+	if err != nil {
+		return err
+	}
+	if _, ok := s.allowed[key]; !ok {
+		// Only host:port is reported; the URL may carry secrets in its query.
+		return fmt.Errorf("%w: %s is not in scope.allowHosts", ErrOutOfScope, key)
+	}
+	return nil
 }
 
 func closeBody(req *http.Request) {

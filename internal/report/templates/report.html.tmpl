@@ -71,6 +71,8 @@ summary{cursor:pointer;color:var(--muted)}
 <div class="card {{.Severity}}"><b>{{.Count}}</b><span>{{.Severity}}</span></div>
 {{- end}}
 <div class="card"><b>{{.R.Stats.Requests}}</b><span>requests</span></div>
+<div class="card"><b>{{.R.Stats.Blocked}}</b><span>blocked</span></div>
+<div class="card"><b>{{.R.Stats.Errors}}</b><span>errors</span></div>
 <div class="card"><b>{{.R.Stats.Endpoints}}</b><span>endpoints</span></div>
 <div class="card"><b>{{.Duration}}</b><span>duration</span></div>
 </div>

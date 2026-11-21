@@ -43,3 +43,13 @@ follows [Semantic Versioning](https://semver.org/).
   profile owns is skipped; method swap never probes as an admin and never
   sends destructive methods to collection paths; the `DELETE` phase runs
   sequentially; mass assignment no longer tests admin profiles.
+
+### Fixed
+
+- A scan in which no request received an HTTP response exits `2` with an
+  error instead of reporting "No findings."; the terminal summary and HTML
+  report show blocked requests and errors, and every authenticated profile
+  that never got a `2xx` is logged as a warning.
+- Waiting for the rate limiter no longer counts against `safety.timeout`, so
+  low `--rate` values do not cause spurious timeouts; blocked requests never
+  consume a rate-limit token.

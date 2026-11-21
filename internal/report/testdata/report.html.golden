@@ -73,6 +73,8 @@ summary{cursor:pointer;color:var(--muted)}
 <div class="card low"><b>0</b><span>low</span></div>
 <div class="card info"><b>0</b><span>info</span></div>
 <div class="card"><b>27</b><span>requests</span></div>
+<div class="card"><b>1</b><span>blocked</span></div>
+<div class="card"><b>0</b><span>errors</span></div>
 <div class="card"><b>3</b><span>endpoints</span></div>
 <div class="card"><b>2.5s</b><span>duration</span></div>
 </div>
