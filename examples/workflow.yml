@@ -1,0 +1,31 @@
+# Example: run authdiff against a staging API on every pull request.
+# Copy to .github/workflows/authdiff.yml in your repository.
+#
+# Store each profile's token as a repository secret and expose it as the
+# environment variable your authdiff.yaml references (${env:ADMIN_TOKEN} ...).
+# Only scan systems you are authorized to test.
+name: authdiff
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write   # SARIF upload to code scanning
+
+jobs:
+  authz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ardayesilcayir/authdiff/action@v1
+        with:
+          config: authdiff.yaml
+          version: v1.0.0
+          fail-on: high
+          upload-sarif: "true"
+        env:
+          ADMIN_TOKEN: ${{ secrets.AUTHDIFF_ADMIN_TOKEN }}
+          ALICE_TOKEN: ${{ secrets.AUTHDIFF_ALICE_TOKEN }}
+          BOB_TOKEN: ${{ secrets.AUTHDIFF_BOB_TOKEN }}

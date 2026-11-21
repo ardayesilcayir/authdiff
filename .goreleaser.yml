@@ -1,0 +1,90 @@
+# GoReleaser v2 config. Release: push a v* tag (see .github/workflows/release.yml).
+# Local check: goreleaser check && goreleaser release --snapshot --clean
+version: 2
+
+project_name: authdiff
+
+before:
+  hooks:
+    - go test ./...
+
+builds:
+  - id: authdiff
+    main: ./cmd/authdiff
+    binary: authdiff
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X main.version={{ .Version }} -X main.commit={{ .ShortCommit }} -X main.date={{ .Date }}
+
+archives:
+  - id: authdiff
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - CHANGELOG.md
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+dockers:
+  - id: authdiff-amd64
+    ids: [authdiff]
+    goos: linux
+    goarch: amd64
+    dockerfile: Dockerfile
+    use: buildx
+    image_templates:
+      - "ghcr.io/ardayesilcayir/authdiff:{{ .Version }}-amd64"
+    build_flag_templates:
+      - --platform=linux/amd64
+      - --label=org.opencontainers.image.source=https://github.com/ardayesilcayir/authdiff
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.revision={{ .FullCommit }}
+      - --label=org.opencontainers.image.licenses=MIT
+  - id: authdiff-arm64
+    ids: [authdiff]
+    goos: linux
+    goarch: arm64
+    dockerfile: Dockerfile
+    use: buildx
+    image_templates:
+      - "ghcr.io/ardayesilcayir/authdiff:{{ .Version }}-arm64"
+    build_flag_templates:
+      - --platform=linux/arm64
+      - --label=org.opencontainers.image.source=https://github.com/ardayesilcayir/authdiff
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.revision={{ .FullCommit }}
+      - --label=org.opencontainers.image.licenses=MIT
+
+docker_manifests:
+  - name_template: "ghcr.io/ardayesilcayir/authdiff:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/ardayesilcayir/authdiff:{{ .Version }}-amd64"
+      - "ghcr.io/ardayesilcayir/authdiff:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/ardayesilcayir/authdiff:latest"
+    skip_push: auto
+    image_templates:
+      - "ghcr.io/ardayesilcayir/authdiff:{{ .Version }}-amd64"
+      - "ghcr.io/ardayesilcayir/authdiff:{{ .Version }}-arm64"
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+release:
+  prerelease: auto

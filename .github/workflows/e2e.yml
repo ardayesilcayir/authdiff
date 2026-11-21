@@ -1,0 +1,80 @@
+name: E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Scan vuln-lab
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # The lab keeps its data in memory and is reseeded on every start.
+      # `make e2e` recreates the container, so the test always sees a fresh lab.
+      - name: Start vuln-lab
+        run: docker compose up -d --build --wait vuln-lab
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/products > /dev/null && exit 0
+            sleep 2
+          done
+          docker compose logs vuln-lab
+          exit 1
+
+      - name: End-to-end test (fresh lab, destructive)
+        run: make e2e
+
+      # The e2e scan mutated the lab; recreate it for the SARIF scan.
+      - name: Restart vuln-lab
+        run: make lab-restart
+
+      # SARIF locations must be repo-relative files, so scan a local copy of
+      # the spec instead of the URL.
+      - name: Download the lab spec
+        run: curl -sf http://localhost:8000/openapi.json -o vuln-lab/openapi.json
+      - name: Build CI config
+        run: |
+          sed 's#spec: http://localhost:8000/openapi.json#spec: ../vuln-lab/openapi.json#' \n            examples/authdiff.yaml > examples/authdiff.ci.yaml
+          grep -q 'spec: ../vuln-lab/openapi.json' examples/authdiff.ci.yaml
+      # Build first: `go run` reports every non-zero exit as 1.
+      - name: Build the CLI
+        run: go build -o dist/authdiff ./cmd/authdiff
+      - name: Scan with the CLI
+        id: scan
+        run: |
+          set -a; . examples/vuln-lab.env; set +a
+          ./dist/authdiff scan -c examples/authdiff.ci.yaml \
+            --format terminal,sarif,json --output authdiff-out --no-color || status=$?
+          status=${status:-0}
+          echo "exit=$status" >> "$GITHUB_OUTPUT"
+          # 1 = findings above failOn (expected against the lab); 2 = error.
+          [ "$status" -le 1 ]
+      - name: Upload SARIF
+        if: always() && hashFiles('authdiff-out/results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: authdiff-out/results.sarif
+          category: authdiff-vuln-lab
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: authdiff-report
+          path: authdiff-out/
+
+      - name: Stop vuln-lab
+        if: always()
+        run: docker compose down
