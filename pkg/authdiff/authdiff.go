@@ -5,6 +5,7 @@ package authdiff
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -26,6 +27,9 @@ type Result = finding.Result
 
 // Finding is one reported authorization problem.
 type Finding = finding.Finding
+
+// Progress is one scan progress event; see ScanOptions.OnProgress.
+type Progress = engine.Progress
 
 // maxRetries is the global retry budget for network errors and 429/503.
 const maxRetries = 3
@@ -50,7 +54,22 @@ type Overrides struct {
 
 // ScanOptions configures Scan and Plan.
 type ScanOptions struct {
+	// ConfigPath is the authdiff.yaml to load. Set it or Config, not both.
 	ConfigPath string
+	// Config is an in-memory config used instead of ConfigPath. It is
+	// copied: defaults and Overrides are applied to the copy and the copy is
+	// validated, so the caller's value is never changed. ${env:X} is not
+	// expanded (that happens only when reading a file).
+	Config *config.Config
+	// BaseDir resolves a relative target.spec and rules.dirs of Config;
+	// "" means the working directory. Ignored with ConfigPath (paths are
+	// relative to the config file).
+	BaseDir string
+	// OnProgress, when set, receives Scan's progress events (with Planned
+	// set to the dry-run plan size). It is called from the engine's
+	// goroutines, one call at a time, and must return quickly; see
+	// engine.RunOptions.OnProgress. Plan ignores it.
+	OnProgress func(Progress)
 	// IgnoreFile is the baseline of suppressed finding IDs; "" means none.
 	// A missing file is an empty baseline.
 	IgnoreFile string
@@ -77,9 +96,47 @@ func LoadConfig(path string, o Overrides) (*config.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	base := filepath.Dir(path)
+	resolvePaths(cfg, filepath.Dir(path))
+	applyOverrides(cfg, o)
+	if err := config.Validate(cfg); err != nil {
+		return nil, newScrubber(cfg).Err(err)
+	}
+	return cfg, nil
+}
+
+// errBothConfigs is returned when ScanOptions sets ConfigPath and Config.
+var errBothConfigs = errors.New("authdiff: set ConfigPath or Config, not both")
+
+// resolveConfig returns the validated config of o, from ConfigPath or from
+// a copy of Config.
+func resolveConfig(o ScanOptions) (*config.Config, error) {
+	if o.Config == nil {
+		return LoadConfig(o.ConfigPath, o.Overrides)
+	}
+	if o.ConfigPath != "" {
+		return nil, errBothConfigs
+	}
+	return prepareConfig(o.Config, o.BaseDir, o.Overrides)
+}
+
+// prepareConfig is LoadConfig for an in-memory config: it copies c, applies
+// defaults, resolves relative paths against baseDir, applies o and
+// validates the copy.
+func prepareConfig(c *config.Config, baseDir string, o Overrides) (*config.Config, error) {
+	cfg := c.Clone()
+	cfg.ApplyDefaults()
+	resolvePaths(cfg, baseDir)
+	applyOverrides(cfg, o)
+	if err := config.Validate(cfg); err != nil {
+		return nil, newScrubber(cfg).Err(err)
+	}
+	return cfg, nil
+}
+
+// resolvePaths makes a relative spec path and rules.dirs relative to base.
+func resolvePaths(cfg *config.Config, base string) {
 	cfg.Target.Spec = lowerScheme(cfg.Target.Spec)
-	if s := cfg.Target.Spec; !isURL(s) && !filepath.IsAbs(s) {
+	if s := cfg.Target.Spec; s != "" && !isURL(s) && !filepath.IsAbs(s) {
 		cfg.Target.Spec = filepath.Join(base, s)
 	}
 	for i, d := range cfg.Rules.Dirs {
@@ -87,11 +144,6 @@ func LoadConfig(path string, o Overrides) (*config.Config, error) {
 			cfg.Rules.Dirs[i] = filepath.Join(base, d)
 		}
 	}
-	applyOverrides(cfg, o)
-	if err := config.Validate(cfg); err != nil {
-		return nil, newScrubber(cfg).Err(err)
-	}
-	return cfg, nil
 }
 
 func applyOverrides(cfg *config.Config, o Overrides) {
@@ -235,6 +287,24 @@ func LoadInventory(ctx context.Context, path string, o Overrides, version string
 	if err != nil {
 		return nil, err
 	}
+	return inventoryOf(ctx, cfg, version)
+}
+
+// LoadInventoryConfig is LoadInventory for an in-memory config: cfg is
+// copied, defaulted, resolved against baseDir ("" = working directory) and
+// validated; the caller's value is not changed.
+func LoadInventoryConfig(ctx context.Context, cfg *config.Config, baseDir, version string) (*spec.Inventory, error) {
+	c, err := prepareConfig(cfg, baseDir, Overrides{})
+	if err != nil {
+		return nil, err
+	}
+	return inventoryOf(ctx, c, version)
+}
+
+// inventoryOf loads the inventory of a prepared config, downloading a URL
+// spec through the scoped transport.
+func inventoryOf(ctx context.Context, cfg *config.Config, version string) (*spec.Inventory, error) {
+	var err error
 	var client *transport.Client
 	if isURL(cfg.Target.Spec) {
 		if client, err = newClient(cfg, version, nil); err != nil {
@@ -278,7 +348,7 @@ func logger(l *slog.Logger) *slog.Logger {
 // written.
 func Scan(ctx context.Context, o ScanOptions) (*Result, error) {
 	log := logger(o.Log)
-	cfg, err := LoadConfig(o.ConfigPath, o.Overrides)
+	cfg, err := resolveConfig(o)
 	if err != nil {
 		return nil, err
 	}
@@ -300,9 +370,15 @@ func Scan(ctx context.Context, o ScanOptions) (*Result, error) {
 	}
 	log.Info("scan starting", "target", RedactURL(cfg.Target.BaseURL), "endpoints", len(inv.Endpoints),
 		"rules", len(rs), "profiles", len(cfg.Profiles))
-	res, runErr := engine.Run(ctx, engine.RunOptions{
-		Config: cfg, Inventory: inv, Rules: rs, Client: client, Log: log, Version: o.Version,
-	})
+	run := engine.RunOptions{Config: cfg, Inventory: inv, Rules: rs, Client: client, Log: log, Version: o.Version}
+	if o.OnProgress != nil {
+		plan, err := engine.DryRun(run)
+		if err != nil {
+			return nil, err
+		}
+		run.Planned, run.OnProgress = len(plan), o.OnProgress
+	}
+	res, runErr := engine.Run(ctx, run)
 	runErr = newScrubber(cfg).Err(runErr)
 	if res == nil {
 		return nil, runErr
@@ -339,7 +415,7 @@ func Plan(o ScanOptions) ([]engine.PlannedRequest, error) {
 // transport, cancellable by ctx).
 func PlanContext(ctx context.Context, o ScanOptions) ([]engine.PlannedRequest, error) {
 	log := logger(o.Log)
-	cfg, err := LoadConfig(o.ConfigPath, o.Overrides)
+	cfg, err := resolveConfig(o)
 	if err != nil {
 		return nil, err
 	}

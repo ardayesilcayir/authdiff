@@ -28,6 +28,17 @@ type RunOptions struct {
 	Sender    Sender // nil means NewSender(Client)
 	Log       *slog.Logger
 	Version   string
+	// Planned is the dry-run plan size, reported in every Progress event.
+	Planned int
+	// OnProgress, when set, receives progress events: at the start of each
+	// phase, after every request sent (blocked and failed ones included),
+	// once per finding a check produces, and last, once, with Done set
+	// after the result is assembled (also on cancellation). It is called
+	// from the engine's worker goroutines, one call at a time, and the scan
+	// waits for it to return: it must be fast and must not block (hand the
+	// event to a buffered channel and drop it when full; the counters are
+	// cumulative, so a dropped event loses nothing).
+	OnProgress func(Progress)
 }
 
 func (o RunOptions) validate() error {
@@ -72,6 +83,10 @@ func Run(ctx context.Context, o RunOptions) (*finding.Result, error) {
 		}
 		sender = NewSender(o.Client)
 	}
+	prog := newProgress(o)
+	if prog != nil {
+		sender = &progressSender{inner: sender, p: prog}
+	}
 	checks, err := NewChecks(o.Rules)
 	if err != nil {
 		return nil, err
@@ -85,7 +100,10 @@ func Run(ctx context.Context, o RunOptions) (*finding.Result, error) {
 	var observations []Observation
 	eps := o.Inventory.Endpoints
 	finish := func(runErr error) (*finding.Result, error) {
-		findings = append(findings, matrixFindings(checks, o.Config, observations, findings, eps)...)
+		prog.startPhase(finishPhase)
+		mf := matrixFindings(checks, o.Config, observations, findings, eps)
+		prog.findings(mf)
+		findings = append(findings, mf...)
 		merged := mergeFindings(findings)
 		finding.Sort(merged)
 		keys := make(map[string]bool, len(eps))
@@ -116,9 +134,13 @@ func Run(ctx context.Context, o RunOptions) (*finding.Result, error) {
 		if runErr == nil {
 			warnNo2xx(env, observations)
 		}
+		prog.done()
 		return res, runErr
 	}
 
+	if len(o.Config.Harvest) > 0 {
+		prog.startPhase(harvestPhase)
+	}
 	if err := harvest(ctx, env, o.Inventory); err != nil {
 		return finish(err)
 	}
@@ -129,6 +151,7 @@ func Run(ctx context.Context, o RunOptions) (*finding.Result, error) {
 	}
 	log := env.logger()
 	for _, phase := range phasesOf(eps, checks, env) {
+		prog.startPhase(phase)
 		outs := make([]Outcome, len(eps))
 		var g errgroup.Group
 		if phase == deletePhase {
@@ -149,6 +172,7 @@ func Run(ctx context.Context, o RunOptions) (*finding.Result, error) {
 						continue
 					}
 					out, err := c.Run(ctx, ep, env)
+					prog.findings(out.Findings)
 					outs[i].Findings = append(outs[i].Findings, out.Findings...)
 					outs[i].Observations = append(outs[i].Observations, out.Observations...)
 					if err != nil {

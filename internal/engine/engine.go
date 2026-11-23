@@ -52,6 +52,25 @@ type Outcome struct {
 	Observations []Observation
 }
 
+// Progress is one scan progress event, passed to RunOptions.OnProgress.
+// Sent, Blocked and Errors are cumulative over the whole scan (the
+// transport's request, blocked and error counts) and never decrease.
+type Progress struct {
+	// Phase is 0 harvest, 1 read, 2 write, 3 swap, 4 delete, 5 finish;
+	// PhaseName is the matching name.
+	Phase     int
+	PhaseName string
+	// Planned is RunOptions.Planned (the dry-run plan size); harvest
+	// requests are not planned, so Sent can exceed it.
+	Planned               int
+	Sent, Blocked, Errors int
+	// Finding is set on the event for a finding a check just produced. It
+	// is a read-only copy; the same ID may be reported more than once.
+	Finding *finding.Finding
+	// Done is set on the last event only, after the result is assembled.
+	Done bool
+}
+
 // PlannedRequest is a request a check would send, reported by dry runs.
 type PlannedRequest struct {
 	RuleID, Endpoint, Step, Profile, Method, Path string

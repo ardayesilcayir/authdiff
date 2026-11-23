@@ -16,69 +16,69 @@ import (
 
 // Config is the root of authdiff.yaml.
 type Config struct {
-	Version  int                   `yaml:"version"`
-	Target   Target                `yaml:"target"`
-	Scope    Scope                 `yaml:"scope"`
-	Safety   Safety                `yaml:"safety"`
-	Profiles map[string]Profile    `yaml:"profiles"`
-	Harvest  []HarvestRule         `yaml:"harvest"`
-	Matrix   map[string]MatrixRule `yaml:"matrix"`
-	Compare  Compare               `yaml:"compare"`
-	Output   Output                `yaml:"output"`
-	Filter   Filter                `yaml:"filter"`
-	Bodies   map[string]any        `yaml:"bodies"`
-	Rules    RulesCfg              `yaml:"rules"`
+	Version  int                   `yaml:"version,omitempty"`
+	Target   Target                `yaml:"target,omitempty"`
+	Scope    Scope                 `yaml:"scope,omitempty"`
+	Safety   Safety                `yaml:"safety,omitempty"`
+	Profiles map[string]Profile    `yaml:"profiles,omitempty"`
+	Harvest  []HarvestRule         `yaml:"harvest,omitempty"`
+	Matrix   map[string]MatrixRule `yaml:"matrix,omitempty"`
+	Compare  Compare               `yaml:"compare,omitempty"`
+	Output   Output                `yaml:"output,omitempty"`
+	Filter   Filter                `yaml:"filter,omitempty"`
+	Bodies   map[string]any        `yaml:"bodies,omitempty"`
+	Rules    RulesCfg              `yaml:"rules,omitempty"`
 }
 
 // Target describes the API under test.
 type Target struct {
-	BaseURL string `yaml:"baseUrl"`
-	Spec    string `yaml:"spec"`
+	BaseURL string `yaml:"baseUrl,omitempty"`
+	Spec    string `yaml:"spec,omitempty"`
 }
 
 // Scope restricts which hosts may be contacted.
 type Scope struct {
-	AllowHosts               []string `yaml:"allowHosts"`
-	AcknowledgeAuthorization bool     `yaml:"acknowledgeAuthorization"`
+	AllowHosts               []string `yaml:"allowHosts,omitempty"`
+	AcknowledgeAuthorization bool     `yaml:"acknowledgeAuthorization,omitempty"`
 }
 
 // Safety holds request-pacing and safety limits.
 type Safety struct {
-	Rate             float64       `yaml:"rate"`
-	Concurrency      int           `yaml:"concurrency"`
-	AllowDestructive bool          `yaml:"allowDestructive"`
-	Timeout          time.Duration `yaml:"timeout"`
-	MaxResponseBytes int64         `yaml:"maxResponseBytes"`
-	Insecure         bool          `yaml:"insecure"`
+	Rate             float64       `yaml:"rate,omitempty"`
+	Concurrency      int           `yaml:"concurrency,omitempty"`
+	AllowDestructive bool          `yaml:"allowDestructive,omitempty"`
+	Timeout          time.Duration `yaml:"timeout,omitempty"`
+	MaxResponseBytes int64         `yaml:"maxResponseBytes,omitempty"`
+	Insecure         bool          `yaml:"insecure,omitempty"`
 	// Proxy is an explicit proxy URL; empty means none (HTTP(S)_PROXY are
 	// ignored).
-	Proxy string `yaml:"proxy"`
+	Proxy string `yaml:"proxy,omitempty"`
 }
 
 // Profile is one identity used during a scan.
 type Profile struct {
 	Name        string              `yaml:"-"`
-	Role        string              `yaml:"role"`
-	Auth        Auth                `yaml:"auth"`
-	Owns        map[string][]string `yaml:"owns"`
-	Identifiers []string            `yaml:"identifiers"`
+	Role        string              `yaml:"role,omitempty"`
+	Auth        Auth                `yaml:"auth,omitempty"`
+	Owns        map[string][]string `yaml:"owns,omitempty"`
+	Identifiers []string            `yaml:"identifiers,omitempty"`
 }
 
 // Auth describes how a profile authenticates. Type is one of
 // bearer, cookie, apikey, basic, none.
 type Auth struct {
-	Type     string `yaml:"type"`
-	Token    string `yaml:"token"`
-	Name     string `yaml:"name"`
-	In       string `yaml:"in"`
-	Username string `yaml:"username"`
-	Password string `yaml:"password"`
+	Type     string `yaml:"type,omitempty"`
+	Token    string `yaml:"token,omitempty"`
+	Name     string `yaml:"name,omitempty"`
+	In       string `yaml:"in,omitempty"`
+	Username string `yaml:"username,omitempty"`
+	Password string `yaml:"password,omitempty"`
 }
 
 // HarvestRule collects identifiers from a profile's own responses.
 type HarvestRule struct {
-	Endpoint string            `yaml:"endpoint"`
-	Extract  map[string]string `yaml:"extract"`
+	Endpoint string            `yaml:"endpoint,omitempty"`
+	Extract  map[string]string `yaml:"extract,omitempty"`
 }
 
 // MatrixRule is the expected authorization for an endpoint pattern.
@@ -88,28 +88,28 @@ type MatrixRule struct {
 
 // Compare tunes response comparison.
 type Compare struct {
-	IgnoreFields        []string `yaml:"ignoreFields"`
-	SimilarityThreshold float64  `yaml:"similarityThreshold"`
+	IgnoreFields        []string `yaml:"ignoreFields,omitempty"`
+	SimilarityThreshold float64  `yaml:"similarityThreshold,omitempty"`
 }
 
 // Output configures reporting.
 type Output struct {
-	Formats []string `yaml:"formats"`
-	Dir     string   `yaml:"dir"`
-	FailOn  string   `yaml:"failOn"`
+	Formats []string `yaml:"formats,omitempty"`
+	Dir     string   `yaml:"dir,omitempty"`
+	FailOn  string   `yaml:"failOn,omitempty"`
 }
 
 // Filter selects which operations to test.
 type Filter struct {
-	Include []string `yaml:"include"`
-	Exclude []string `yaml:"exclude"`
-	Tags    []string `yaml:"tags"`
+	Include []string `yaml:"include,omitempty"`
+	Exclude []string `yaml:"exclude,omitempty"`
+	Tags    []string `yaml:"tags,omitempty"`
 }
 
 // RulesCfg configures rule loading.
 type RulesCfg struct {
-	Dirs    []string `yaml:"dirs"`
-	Disable []string `yaml:"disable"`
+	Dirs    []string `yaml:"dirs,omitempty"`
+	Disable []string `yaml:"disable,omitempty"`
 }
 
 var envRe = regexp.MustCompile(`\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}`)

@@ -51,3 +51,15 @@ func (s *clientSender) Send(ctx context.Context, p *identity.Profile, step strin
 	resp.Exchange.Profile = name
 	return resp, nil
 }
+
+// progressSender reports every Send to a progress tracker.
+type progressSender struct {
+	inner Sender
+	p     *progress
+}
+
+func (s *progressSender) Send(ctx context.Context, pr *identity.Profile, step string, r planner.Request) (*transport.Response, error) {
+	resp, err := s.inner.Send(ctx, pr, step, r)
+	s.p.afterSend(err)
+	return resp, err
+}
