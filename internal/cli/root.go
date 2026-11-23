@@ -91,7 +91,7 @@ func (a *app) rootCmd() *cobra.Command {
 	pf.BoolVarP(&a.verbose, "verbose", "v", false, "enable debug logging")
 	pf.StringVar(&a.logFormat, "log-format", "text", "log format on stderr: text or json")
 	pf.BoolVar(&a.noColor, "no-color", false, "disable colored terminal output")
-	root.AddCommand(a.initCmd(), a.inventoryCmd(), a.scanCmd(), a.rulesCmd(), a.reportCmd(), a.versionCmd())
+	root.AddCommand(a.initCmd(), a.inventoryCmd(), a.scanCmd(), a.rulesCmd(), a.reportCmd(), a.uiCmd(), a.versionCmd())
 	return root
 }
 

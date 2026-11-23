@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="{{.Lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{{.Title}} | authdiff</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/app.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">{{call .T "layout.skip"}}</a>
+<header class="top">
+<div class="wrap top-in">
+<a class="brand" href="/">authdiff</a>
+{{- if .CSRF}}
+<nav class="nav" aria-label="{{call .T "layout.nav.label"}}">
+<a href="/"{{if eq .Nav "home"}} aria-current="page"{{end}}>{{call .T "layout.nav.home"}}</a>
+<a href="/projects"{{if eq .Nav "projects"}} aria-current="page"{{end}}>{{call .T "layout.nav.projects"}}</a>
+</nav>
+<form class="lang" method="post" action="/lang">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<input type="hidden" name="next" value="{{.Path}}">
+<div class="seg" role="group" aria-label="{{call .T "layout.lang.label"}}">
+<button type="submit" name="lang" value="tr" lang="tr" title="Türkçe" aria-pressed="{{if eq .Lang "tr"}}true{{else}}false{{end}}">TR</button>
+<button type="submit" name="lang" value="en" lang="en" title="English" aria-pressed="{{if eq .Lang "en"}}true{{else}}false{{end}}">EN</button>
+</div>
+</form>
+{{- end}}
+</div>
+</header>
+{{- with .Flash}}
+<div class="wrap"><p class="flash" role="status">{{.}}</p></div>
+{{- end}}
+<main id="main" class="wrap">
+{{template "content" .}}
+</main>
+<footer class="foot">
+<div class="wrap">
+<p>{{call .T "layout.ethics"}} <a href="https://www.mevzuat.gov.tr/mevzuatmetin/1.5.5237.pdf" target="_blank" rel="noopener noreferrer">{{call .T "layout.ethics.link"}}</a>.</p>
+{{- if .Version}}
+<p class="muted">{{call .T "layout.version" .Version}}</p>
+{{- end}}
+</div>
+</footer>
+</body>
+</html>

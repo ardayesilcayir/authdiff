@@ -1,0 +1,57 @@
+{{define "content"}}
+<section class="intro">
+<h1>{{call .T "home.title"}}</h1>
+<p class="lead">{{call .T "home.lead"}}</p>
+</section>
+
+<div class="paths">
+<section class="panel" aria-labelledby="demo-h">
+<h2 id="demo-h">{{call .T "home.demo.title"}}</h2>
+<p>{{call .T "home.demo.body"}}</p>
+{{- if .Data.LabOK}}
+<p class="lab ok" role="status" aria-label="{{call .T "home.lab.label"}}"><span class="mark" aria-hidden="true"></span>{{call .T "home.lab.running" .Data.LabURL}}</p>
+<form method="post" action="/demo">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<button class="btn primary" type="submit">{{call .T "home.demo.action"}}</button>
+</form>
+{{- else}}
+<p class="lab down" role="status" aria-label="{{call .T "home.lab.label"}}"><span class="mark" aria-hidden="true"></span>{{call .T "home.lab.stopped" .Data.LabURL}}</p>
+<p class="hint">{{call .T "home.lab.start_hint"}}</p>
+<div class="cmd">
+<p class="cmd-label" id="cmd-docker-l">{{call .T "home.lab.start_docker"}}</p>
+<div class="cmd-row">
+<pre aria-labelledby="cmd-docker-l"><code id="cmd-docker">docker compose up -d --build --wait vuln-lab</code></pre>
+<button class="btn small" type="button" data-copy="cmd-docker" data-done="{{call .T "copy.done"}}" data-failed="{{call .T "copy.failed"}}" hidden>{{call .T "copy.action"}}</button>
+</div>
+</div>
+<div class="cmd">
+<p class="cmd-label" id="cmd-python-l">{{call .T "home.lab.start_python"}}</p>
+<div class="cmd-row">
+<pre aria-labelledby="cmd-python-l"><code id="cmd-python">cd vuln-lab &amp;&amp; python -m venv .venv &amp;&amp; .venv/bin/pip install -r requirements.txt &amp;&amp; .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000</code></pre>
+<button class="btn small" type="button" data-copy="cmd-python" data-done="{{call .T "copy.done"}}" data-failed="{{call .T "copy.failed"}}" hidden>{{call .T "copy.action"}}</button>
+</div>
+</div>
+{{- end}}
+</section>
+
+<section class="panel" aria-labelledby="own-h">
+<h2 id="own-h">{{call .T "home.own.title"}}</h2>
+<p>{{call .T "home.own.body"}}</p>
+<a class="btn primary" href="/projects/new">{{call .T "home.own.action"}}</a>
+</section>
+</div>
+
+<section class="recent" aria-labelledby="recent-h">
+<h2 id="recent-h">{{call .T "home.recent.title"}}</h2>
+{{- if .Data.Projects}}
+<ul class="plist">
+{{- range .Data.Projects}}
+<li><a href="/p/{{.Name}}">{{.Name}}</a> <span class="muted">{{call $.T "home.recent.updated" .Updated}}</span></li>
+{{- end}}
+</ul>
+<p><a href="/projects">{{call .T "home.recent.all"}}</a></p>
+{{- else}}
+<p class="empty">{{call .T "home.recent.empty"}}</p>
+{{- end}}
+</section>
+{{end}}
