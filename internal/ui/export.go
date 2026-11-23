@@ -78,11 +78,13 @@ func WriteExportZip(w io.Writer, st *Store, p *Project) error {
 	return zw.Close()
 }
 
-// readProjectFile reads a file directly inside a project directory; name
-// must not contain a path separator.
+// readProjectFile reads the ignore file or an uploaded spec (spec.yaml,
+// spec.json) of a project directory; any other name is refused.
 func readProjectFile(dir, name string) ([]byte, error) {
-	if name != filepath.Base(name) || strings.ContainsAny(name, `/\`) || name == ".." {
-		return nil, fmt.Errorf("invalid file name %q", name)
+	if name != ignoreFile {
+		if err := checkSpecFile(name); err != nil || name == "" {
+			return nil, fmt.Errorf("invalid file name %q", name)
+		}
 	}
-	return os.ReadFile(filepath.Join(dir, name)) //nolint:gosec // G304: name checked to stay inside dir
+	return os.ReadFile(filepath.Join(dir, name)) //nolint:gosec // G304: name is one of three fixed file names
 }

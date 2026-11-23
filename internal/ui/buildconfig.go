@@ -24,6 +24,9 @@ func (e ErrMissingSecrets) Error() string {
 // uploaded spec resolves to projectDir/SpecFile. The result holds real
 // secrets and must never be written to disk.
 func BuildConfig(p *Project, sec *Secrets, projectDir string) (*config.Config, error) {
+	if err := checkBuildable(p); err != nil {
+		return nil, err
+	}
 	c := baseConfig(p)
 	if p.SpecFile != "" {
 		c.Target.Spec = p.SpecFile
@@ -51,6 +54,9 @@ func BuildConfig(p *Project, sec *Secrets, projectDir string) (*config.Config, e
 // credential is a ${env:NAME} placeholder (EnvName, or the example's names
 // for the demo project) and an uploaded spec is the relative SpecFile.
 func PlaceholderConfig(p *Project) (*config.Config, error) {
+	if err := checkBuildable(p); err != nil {
+		return nil, err
+	}
 	c := baseConfig(p)
 	if p.SpecFile != "" {
 		c.Target.Spec = p.SpecFile
@@ -67,13 +73,26 @@ func PlaceholderConfig(p *Project) (*config.Config, error) {
 	return finish(c)
 }
 
-// envVars lists, in profile order, the environment variables p's
-// PlaceholderConfig refers to.
+// checkBuildable rejects colliding profile names and a SpecFile outside
+// the allowed names before any config is built from p.
+func checkBuildable(p *Project) error {
+	if err := ValidateProfileNames(p); err != nil {
+		return err
+	}
+	return checkSpecFile(p.SpecFile)
+}
+
+// envVars lists, in profile order and without repeats, the environment
+// variables p's PlaceholderConfig refers to.
 func envVars(p *Project) []string {
 	var out []string
+	seen := map[string]bool{}
 	for _, pd := range p.Profiles {
 		for _, f := range secretFields(pd.AuthType) {
-			out = append(out, envNameFor(p, pd.Name, f))
+			if n := envNameFor(p, pd.Name, f); !seen[n] {
+				seen[n] = true
+				out = append(out, n)
+			}
 		}
 	}
 	return out

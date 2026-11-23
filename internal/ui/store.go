@@ -99,6 +99,9 @@ func (s *Store) Get(name string) (*Project, error) {
 		return nil, fmt.Errorf("project %q: %w", name, err)
 	}
 	p.Name = name
+	if err := checkStored(&p); err != nil {
+		return nil, fmt.Errorf("project %q: %w", name, err)
+	}
 	return &p, nil
 }
 
@@ -106,6 +109,9 @@ func (s *Store) Get(name string) (*Project, error) {
 // directory (0700). It sets CreatedAt on first save and UpdatedAt always.
 func (s *Store) Save(p *Project) error {
 	if err := checkName(p.Name); err != nil {
+		return err
+	}
+	if err := checkStored(p); err != nil {
 		return err
 	}
 	now := time.Now().UTC()
