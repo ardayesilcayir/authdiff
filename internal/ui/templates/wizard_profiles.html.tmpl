@@ -1,0 +1,136 @@
+{{define "content"}}
+<div class="wizard">
+{{template "steps" .}}
+<section class="wizard-body" aria-labelledby="step-h">
+<h1 id="step-h">{{call .T "wizard.step.profiles"}}</h1>
+<p class="lead">{{call .T "profiles.lead"}}</p>
+{{template "formerrors" .}}
+{{- $f := .Data.Form}}{{$e := .Data.Errors}}
+{{- with index $e "profiles"}}<p class="err" id="profiles-err" role="alert">{{call $.T .}}</p>{{end}}
+{{- if $f.SameRoleWarn}}
+<div class="notice" role="status"><p>{{call .T "profiles.warn.same_role"}}</p></div>
+{{- end}}
+{{- if $f.Missing}}
+<div class="notice" role="status"><p>{{call .T "profiles.warn.missing"}}</p>
+<ul class="inline">{{range $f.Missing}}<li><code>{{.}}</code></li>{{end}}</ul>
+<p class="hint">{{call .T "profiles.warn.missing_hint"}}</p></div>
+{{- end}}
+
+<form method="post" action="/p/{{.Data.P.Name}}/profiles" id="profiles-form">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<div class="template-offer">
+<p>{{call .T "profiles.template.body"}}</p>
+<button class="btn" type="submit" name="action" value="template" formnovalidate>{{call .T "profiles.template.action"}}</button>
+</div>
+
+<div class="cards" id="profile-cards">
+{{- range $f.Cards}}
+{{template "card" (pair $ .)}}
+{{- end}}
+{{template "card" (pair $ $f.Blank)}}
+</div>
+<p><button class="btn small" type="button" id="add-profile" data-cards="profile-cards" data-new-label="{{call .T "profiles.new"}}" hidden>{{call .T "profiles.add"}}</button></p>
+
+<div class="actions">
+<button class="btn primary" type="submit">{{call .T "wizard.save_next"}}</button>
+<button class="btn" type="submit" name="action" value="stay">{{call .T "profiles.save_stay"}}</button>
+<a href="/p/{{.Data.P.Name}}/endpoints">{{call .T "wizard.back"}}</a>
+</div>
+</form>
+</section>
+</div>
+{{end}}
+
+{{define "card"}}
+{{- $r := index . 0}}{{$c := index . 1}}{{$e := $r.Data.Errors}}{{$pre := printf "p%d." $c.Index}}
+<fieldset class="card" data-card data-index="{{$c.Index}}">
+<legend>{{if $c.Orig}}{{$c.Orig}}{{else}}{{call $r.T "profiles.new"}}{{end}}</legend>
+<input type="hidden" name="{{$pre}}orig" value="{{$c.Orig}}">
+<div class="card-grid">
+<div class="field">
+<label for="{{$pre}}name">{{call $r.T "profiles.name"}}</label>
+<input type="text" id="{{$pre}}name" name="{{$pre}}name" value="{{$c.Def.Name}}" autocomplete="off" spellcheck="false" placeholder="alice"{{with index $e (print $pre "name")}} aria-invalid="true" aria-describedby="{{$pre}}name-err"{{end}}>
+{{- with index $e (print $pre "name")}}<p class="err" id="{{$pre}}name-err">{{call $r.T .}}</p>{{else}}<p class="help">{{call $r.T "profiles.name.help"}}</p>{{end}}
+</div>
+<div class="field">
+<label for="{{$pre}}role">{{call $r.T "profiles.role"}}</label>
+<select id="{{$pre}}role" name="{{$pre}}role"{{with index $e (print $pre "role")}} aria-invalid="true"{{end}}>
+{{- range $r.Data.Form.Roles}}
+<option value="{{.}}"{{if eq . $c.Def.Role}} selected{{end}}>{{call $r.T (print "profiles.role." .)}}</option>
+{{- end}}
+</select>
+{{- with index $e (print $pre "role")}}<p class="err">{{call $r.T .}}</p>{{end}}
+</div>
+<div class="field">
+<label for="{{$pre}}auth">{{call $r.T "profiles.auth"}}</label>
+<select id="{{$pre}}auth" name="{{$pre}}auth" data-auth-select{{with index $e (print $pre "auth")}} aria-invalid="true"{{end}}>
+{{- range $r.Data.Form.AuthTypes}}
+<option value="{{.}}"{{if eq . $c.Def.AuthType}} selected{{end}}>{{call $r.T (print "profiles.auth." .)}}</option>
+{{- end}}
+</select>
+{{- with index $e (print $pre "auth")}}<p class="err">{{call $r.T .}}</p>{{end}}
+</div>
+</div>
+
+<div class="card-grid">
+<div class="field" data-auth="bearer cookie apikey">
+<label for="{{$pre}}token">{{call $r.T "profiles.token"}}</label>
+<input type="password" id="{{$pre}}token" name="{{$pre}}token" autocomplete="new-password" spellcheck="false"{{with $c.Masked.token}} placeholder="{{.}}"{{end}}>
+<p class="help">{{with $c.Masked.token}}{{call $r.T "profiles.secret.saved" .}}{{else}}{{call $r.T "profiles.token.help"}}{{end}}</p>
+</div>
+<div class="field" data-auth="cookie apikey">
+<label for="{{$pre}}authName">{{call $r.T "profiles.auth_name"}}</label>
+<input type="text" id="{{$pre}}authName" name="{{$pre}}authName" value="{{$c.Def.AuthName}}" autocomplete="off" spellcheck="false" placeholder="X-API-Key">
+<p class="help">{{call $r.T "profiles.auth_name.help"}}</p>
+</div>
+<div class="field" data-auth="apikey">
+<label for="{{$pre}}authIn">{{call $r.T "profiles.auth_in"}}</label>
+<select id="{{$pre}}authIn" name="{{$pre}}authIn"{{with index $e (print $pre "authIn")}} aria-invalid="true"{{end}}>
+<option value="header"{{if ne $c.Def.AuthIn "query"}} selected{{end}}>{{call $r.T "profiles.auth_in.header"}}</option>
+<option value="query"{{if eq $c.Def.AuthIn "query"}} selected{{end}}>{{call $r.T "profiles.auth_in.query"}}</option>
+</select>
+{{- with index $e (print $pre "authIn")}}<p class="err">{{call $r.T .}}</p>{{end}}
+</div>
+<div class="field" data-auth="basic">
+<label for="{{$pre}}username">{{call $r.T "profiles.username"}}</label>
+<input type="text" id="{{$pre}}username" name="{{$pre}}username" autocomplete="off" spellcheck="false"{{with $c.Masked.username}} placeholder="{{.}}"{{end}}>
+<p class="help">{{with $c.Masked.username}}{{call $r.T "profiles.secret.saved" .}}{{else}}{{call $r.T "profiles.username.help"}}{{end}}</p>
+</div>
+<div class="field" data-auth="basic">
+<label for="{{$pre}}password">{{call $r.T "profiles.password"}}</label>
+<input type="password" id="{{$pre}}password" name="{{$pre}}password" autocomplete="new-password"{{with $c.Masked.password}} placeholder="{{.}}"{{end}}>
+<p class="help">{{with $c.Masked.password}}{{call $r.T "profiles.secret.saved" .}}{{else}}{{call $r.T "profiles.password.help"}}{{end}}</p>
+</div>
+</div>
+
+<details class="more"{{if or $c.Def.Owns $c.Identifiers}} open{{end}}>
+<summary>{{call $r.T "profiles.owns.summary"}}</summary>
+<p class="help">{{call $r.T "profiles.owns.help"}}</p>
+<div class="card-grid">
+{{- range $c.Owns}}
+<div class="field">
+<label for="{{$pre}}owns.{{.Param}}"><code>{{.Param}}</code></label>
+<input type="text" id="{{$pre}}owns.{{.Param}}" name="{{$pre}}owns.{{.Param}}" value="{{.Value}}" autocomplete="off" spellcheck="false" placeholder="1, 2">
+</div>
+{{- end}}
+<div class="field">
+<label for="{{$pre}}ownsParam">{{call $r.T "profiles.owns.other"}}</label>
+<input type="text" id="{{$pre}}ownsParam" name="{{$pre}}ownsParam" value="{{$c.OwnsParam}}" autocomplete="off" spellcheck="false" placeholder="orderId"{{with index $e (print $pre "ownsParam")}} aria-invalid="true"{{end}}>
+{{- with index $e (print $pre "ownsParam")}}<p class="err">{{call $r.T .}}</p>{{end}}
+</div>
+<div class="field">
+<label for="{{$pre}}ownsIds">{{call $r.T "profiles.owns.other_ids"}}</label>
+<input type="text" id="{{$pre}}ownsIds" name="{{$pre}}ownsIds" value="{{$c.OwnsIDs}}" autocomplete="off" spellcheck="false" placeholder="7, 8">
+</div>
+</div>
+<div class="field">
+<label for="{{$pre}}ids">{{call $r.T "profiles.identifiers"}}</label>
+<input type="text" id="{{$pre}}ids" name="{{$pre}}ids" value="{{$c.Identifiers}}" autocomplete="off" spellcheck="false" placeholder="alice@example.com">
+<p class="help">{{call $r.T "profiles.identifiers.help"}}</p>
+</div>
+</details>
+{{- if $c.Orig}}
+<label class="check remove" for="{{$pre}}remove"><input type="checkbox" id="{{$pre}}remove" name="{{$pre}}remove" value="on"> <span>{{call $r.T "profiles.remove"}}</span></label>
+{{- end}}
+</fieldset>
+{{end}}

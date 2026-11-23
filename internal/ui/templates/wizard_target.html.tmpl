@@ -1,0 +1,64 @@
+{{define "content"}}
+<div class="wizard">
+{{template "steps" .}}
+<section class="wizard-body" aria-labelledby="step-h">
+<h1 id="step-h">{{call .T "wizard.step.target"}}</h1>
+<p class="lead">{{call .T "target.lead"}}</p>
+{{template "formerrors" .}}
+{{- $e := .Data.Errors}}{{$f := .Data.Form}}
+<form method="post" action="/p/{{.Data.P.Name}}/target" enctype="multipart/form-data">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+
+<div class="field">
+<label for="baseUrl">{{call .T "target.base.label"}}</label>
+<input type="url" id="baseUrl" name="baseUrl" value="{{$f.BaseURL}}" placeholder="https://staging.example.com" required autocomplete="off" spellcheck="false" aria-describedby="baseUrl-help{{if index $e "baseUrl"}} baseUrl-err{{end}}"{{if index $e "baseUrl"}} aria-invalid="true"{{end}}>
+<p class="help" id="baseUrl-help">{{call .T "target.base.help"}}</p>
+{{- with index $e "baseUrl"}}<p class="err" id="baseUrl-err">{{call $.T .}}</p>{{end}}
+</div>
+
+<fieldset class="group">
+<legend>{{call .T "target.spec.legend"}}</legend>
+<p class="help">{{call .T "target.spec.help"}}</p>
+{{- if $f.SpecFile}}
+<p class="current">{{call .T "target.spec.current" $f.SpecFile}}</p>
+{{- end}}
+<div class="field">
+<label for="specFile">{{call .T "target.spec.file"}}</label>
+<input type="file" id="specFile" name="specFile" accept=".yaml,.yml,.json,application/json,application/yaml" aria-describedby="specFile-help{{if index $e "specFile"}} specFile-err{{end}}"{{if index $e "specFile"}} aria-invalid="true"{{end}}>
+<p class="help" id="specFile-help">{{call .T "target.spec.file.help"}}</p>
+{{- with index $e "specFile"}}<p class="err" id="specFile-err">{{call $.T .}}</p>{{end}}
+</div>
+<p class="or" aria-hidden="true">{{call .T "target.spec.or"}}</p>
+<div class="field">
+<label for="specUrl">{{call .T "target.spec.url"}}</label>
+<input type="url" id="specUrl" name="specUrl" value="{{$f.SpecURL}}" placeholder="https://staging.example.com/openapi.json" autocomplete="off" spellcheck="false" aria-describedby="specUrl-help{{if index $e "specUrl"}} specUrl-err{{end}}"{{if index $e "specUrl"}} aria-invalid="true"{{end}}>
+<p class="help" id="specUrl-help">{{call .T "target.spec.url.help"}}</p>
+{{- with index $e "specUrl"}}<p class="err" id="specUrl-err">{{call $.T .}}</p>{{end}}
+</div>
+</fieldset>
+
+<div class="field">
+<label for="allowHosts">{{call .T "target.hosts.label"}}</label>
+<textarea id="allowHosts" name="allowHosts" rows="3" spellcheck="false" placeholder="staging.example.com:443" aria-describedby="allowHosts-help{{if index $e "allowHosts"}} allowHosts-err{{end}}"{{if index $e "allowHosts"}} aria-invalid="true"{{end}}>{{$f.AllowHosts}}</textarea>
+<p class="help" id="allowHosts-help">{{call .T "target.hosts.help"}}</p>
+{{- with index $e "allowHosts"}}<p class="err" id="allowHosts-err">{{call $.T .}}</p>{{end}}
+</div>
+
+<div class="consent{{if index $e "ack"}} invalid{{end}}">
+<h2>{{call .T "target.ack.title"}}</h2>
+<p>{{call .T "target.ack.body"}}</p>
+<label class="check" for="ack">
+<input type="checkbox" id="ack" name="ack" value="on"{{if $f.Ack}} checked{{end}} required{{if index $e "ack"}} aria-invalid="true" aria-describedby="ack-err"{{end}}>
+<span>{{call .T "target.ack.label"}}</span>
+</label>
+{{- with index $e "ack"}}<p class="err" id="ack-err">{{call $.T .}}</p>{{end}}
+</div>
+
+<div class="actions">
+<button class="btn primary" type="submit">{{call .T "wizard.save_next"}}</button>
+<a href="/p/{{.Data.P.Name}}">{{call .T "wizard.back_overview"}}</a>
+</div>
+</form>
+</section>
+</div>
+{{end}}

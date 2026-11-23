@@ -1,0 +1,20 @@
+{{define "content"}}
+<section class="narrow" aria-labelledby="np-h">
+<h1 id="np-h">{{call .T "newproject.title"}}</h1>
+<p class="lead">{{call .T "newproject.lead"}}</p>
+{{- $e := .Data.Errors}}
+<form method="post" action="/projects/new">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<div class="field">
+<label for="name">{{call .T "newproject.name"}}</label>
+<input type="text" id="name" name="name" value="{{.Data.Name}}" required maxlength="63" pattern="[a-z0-9][a-z0-9\-]{0,62}" autocomplete="off" spellcheck="false" placeholder="staging-api" aria-describedby="name-help{{if index $e "name"}} name-err{{end}}"{{if index $e "name"}} aria-invalid="true"{{end}}>
+<p class="help" id="name-help">{{call .T "newproject.name.help"}}</p>
+{{- with index $e "name"}}<p class="err" id="name-err">{{call $.T .}}</p>{{end}}
+</div>
+<div class="actions">
+<button class="btn primary" type="submit">{{call .T "newproject.create"}}</button>
+<a href="/projects">{{call .T "newproject.cancel"}}</a>
+</div>
+</form>
+</section>
+{{end}}

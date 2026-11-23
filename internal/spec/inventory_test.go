@@ -65,3 +65,18 @@ func TestFilter(t *testing.T) {
 	assert.Equal(t, "t", f.Title)
 	assert.Equal(t, "p", f.SpecPath)
 }
+
+func TestFilterMethodPrefixedExclude(t *testing.T) {
+	inv := &Inventory{Endpoints: []Endpoint{
+		{Method: "GET", Path: "/pets/{petId}"},
+		{Method: "DELETE", Path: "/pets/{petId}"},
+		{Method: "POST", Path: "/pets"},
+		{Method: "GET", Path: "/pets"},
+	}}
+	got := inv.Filter(nil, []string{"DELETE /pets/{petId}", "post /pets"}, nil)
+	var keys []string
+	for _, e := range got.Endpoints {
+		keys = append(keys, e.Key())
+	}
+	assert.Equal(t, []string{"GET /pets/{petId}", "GET /pets"}, keys)
+}

@@ -1,0 +1,52 @@
+{{define "content"}}
+{{- $p := .Data.P}}
+<section class="intro">
+<h1>{{$p.Name}}{{if $p.Demo}} <span class="tag demo">{{call .T "project.demo"}}</span>{{end}}</h1>
+<p class="lead">{{call .T "project.lead"}}</p>
+</section>
+
+<div class="overview">
+<section aria-labelledby="sum-h">
+<h2 id="sum-h">{{call .T "project.summary"}}</h2>
+<dl class="facts">
+<dt>{{call .T "project.base"}}</dt><dd>{{with $p.BaseURL}}<code>{{.}}</code>{{else}}<span class="muted">{{call $.T "project.unset"}}</span>{{end}}</dd>
+<dt>{{call .T "project.spec"}}</dt><dd>{{with .Data.Spec}}<code>{{.}}</code>{{else}}<span class="muted">{{call $.T "project.unset"}}</span>{{end}}</dd>
+<dt>{{call .T "project.profiles"}}</dt><dd>{{len $p.Profiles}}</dd>
+<dt>{{call .T "project.mode"}}</dt><dd>{{if $p.Safety.AllowDestructive}}<span class="tag destructive">{{call .T "project.mode.destructive"}}</span>{{else}}{{call .T "project.mode.safe"}}{{end}}</dd>
+</dl>
+{{- if .Data.Missing}}
+<div class="notice" role="status"><p>{{call .T "profiles.warn.missing"}}</p>
+<ul class="inline">{{range .Data.Missing}}<li><code>{{.}}</code></li>{{end}}</ul></div>
+{{- end}}
+<div class="actions">
+{{- if eq .Data.Next "plan"}}
+<a class="btn primary" href="/p/{{$p.Name}}/plan">{{call .T "project.go_plan"}}</a>
+{{- else}}
+<a class="btn primary" href="/p/{{$p.Name}}/{{.Data.Next}}">{{call .T "project.continue"}}</a>
+{{- end}}
+</div>
+</section>
+
+<section aria-labelledby="steps-h">
+<h2 id="steps-h">{{call .T "project.steps"}}</h2>
+<ol class="steps">
+{{- range .Data.Steps}}
+<li{{if .Done}} class="done"{{end}}><a href="{{.Href}}">{{call $.T .Key}}</a></li>
+{{- end}}
+</ol>
+</section>
+</div>
+
+<section class="danger-zone" aria-labelledby="del-h">
+<h2 id="del-h">{{call .T "project.delete.title"}}</h2>
+<p>{{call .T "project.delete.body"}}</p>
+<form method="post" action="/p/{{$p.Name}}/delete">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<label class="check" for="sure"><input type="checkbox" id="sure" name="sure" value="yes" required{{if index .Data.Errors "sure"}} aria-invalid="true" aria-describedby="sure-err"{{end}}> <span>{{call .T "project.delete.sure"}}</span></label>
+{{- with index .Data.Errors "sure"}}<p class="err" id="sure-err">{{call $.T .}}</p>{{end}}
+<div class="actions">
+<button class="btn danger" type="submit" data-confirm="{{call .T "project.delete.confirm" $p.Name}}">{{call .T "project.delete.action"}}</button>
+</div>
+</form>
+</section>
+{{end}}

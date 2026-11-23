@@ -1,0 +1,16 @@
+{{define "content"}}
+<section class="intro">
+<h1>{{call .T "projects.title"}}</h1>
+<p class="lead">{{call .T "projects.lead"}}</p>
+<p><a class="btn primary" href="/projects/new">{{call .T "projects.new"}}</a></p>
+</section>
+{{- if .Data}}
+<ul class="plist">
+{{- range .Data}}
+<li><a href="/p/{{.Name}}">{{.Name}}</a>{{if .Demo}} <span class="tag demo">{{call $.T "project.demo"}}</span>{{end}} <span class="muted">{{call $.T "home.recent.updated" .Updated}}</span></li>
+{{- end}}
+</ul>
+{{- else}}
+<p class="empty">{{call .T "projects.empty"}}</p>
+{{- end}}
+{{end}}

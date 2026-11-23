@@ -17,6 +17,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -57,6 +58,9 @@ type Server struct {
 	mux     *http.ServeMux
 	handler http.Handler
 	ln      net.Listener
+
+	store   *Store
+	secrets *Secrets
 
 	mu       sync.Mutex
 	onStop   []func(context.Context)
@@ -114,6 +118,10 @@ func New(o Options) (*Server, error) {
 		pages:     pages,
 		mux:       http.NewServeMux(),
 		checkLab: CheckLab,
+		// The projects directory is created on the first save, so New has
+		// no side effect on disk.
+		store:   &Store{root: o.ProjectsDir},
+		secrets: NewSecrets(),
 	}
 	s.port.Store(int64(o.Port))
 	s.routes()
@@ -128,6 +136,20 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /healthz", s.handleHealthz)
 	s.mux.HandleFunc("GET /static/", s.handleStatic)
 	s.mux.HandleFunc("POST /lang", s.handleLang)
+	s.mux.HandleFunc("POST /demo", s.handleDemo)
+	s.mux.HandleFunc("GET /projects", s.handleProjects)
+	s.mux.HandleFunc("GET /projects/new", s.handleNewProjectForm)
+	s.mux.HandleFunc("POST /projects/new", s.handleNewProject)
+	s.mux.HandleFunc("GET /p/{name}", s.handleProject)
+	s.mux.HandleFunc("POST /p/{name}/delete", s.handleDeleteProject)
+	s.mux.HandleFunc("GET /p/{name}/target", s.handleTargetForm)
+	s.mux.HandleFunc("POST /p/{name}/target", s.handleTarget)
+	s.mux.HandleFunc("GET /p/{name}/endpoints", s.handleEndpointsForm)
+	s.mux.HandleFunc("POST /p/{name}/endpoints", s.handleEndpoints)
+	s.mux.HandleFunc("GET /p/{name}/profiles", s.handleProfilesForm)
+	s.mux.HandleFunc("POST /p/{name}/profiles", s.handleProfiles)
+	s.mux.HandleFunc("GET /p/{name}/settings", s.handleSettingsForm)
+	s.mux.HandleFunc("POST /p/{name}/settings", s.handleSettings)
 	s.mux.HandleFunc("/", s.handleNotFound)
 }
 
@@ -212,6 +234,9 @@ type recentProject struct {
 	Updated string
 }
 
+// maxRecent is how many projects the home page lists.
+const maxRecent = 5
+
 type homeData struct {
 	LabOK    bool
 	LabURL   string
@@ -221,9 +246,21 @@ type homeData struct {
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	pd := s.newPage(r, "home.title")
 	pd.Nav = "home"
+	var recent []recentProject
+	rows, err := s.projectRows()
+	if err != nil {
+		s.opts.Log.Warn("list projects", "err", err)
+	}
+	for i, row := range rows {
+		if i == maxRecent {
+			break
+		}
+		recent = append(recent, recentProject{Name: row.Name, Updated: row.Updated})
+	}
 	pd.Data = homeData{
-		LabOK:  s.checkLab(r.Context(), s.opts.LabURL),
-		LabURL: s.opts.LabURL,
+		LabOK:    s.checkLab(r.Context(), s.opts.LabURL),
+		LabURL:   s.opts.LabURL,
+		Projects: recent,
 	}
 	s.render(w, http.StatusOK, "home", pd)
 }
@@ -268,9 +305,19 @@ func (s *Server) handleNotFound(w http.ResponseWriter, r *http.Request) {
 
 // localPath returns p if it is a path on this server, otherwise "/". It
 // rejects scheme-relative ("//host") and backslash tricks browsers treat as
-// such.
+// such, and control characters, which browsers strip (a tab between two
+// slashes is dropped, giving "//host").
 func localPath(p string) string {
 	if !strings.HasPrefix(p, "/") || strings.HasPrefix(p, "//") || strings.Contains(p, `\`) {
+		return "/"
+	}
+	for i := 0; i < len(p); i++ {
+		if p[i] < 0x20 || p[i] == 0x7f {
+			return "/"
+		}
+	}
+	u, err := url.Parse(p)
+	if err != nil || u.Scheme != "" || u.Host != "" || u.User != nil {
 		return "/"
 	}
 	return p

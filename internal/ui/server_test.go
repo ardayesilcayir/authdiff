@@ -263,7 +263,7 @@ func TestLangPostSetsCookie(t *testing.T) {
 	if !strings.Contains(set, langCookie+"=tr") || !strings.Contains(set, "SameSite=Strict") {
 		t.Errorf("Set-Cookie = %q", set)
 	}
-	for _, next := range []string{"//evil.com/", "http://evil.com/", `/\evil.com`, ""} {
+	for _, next := range []string{"//evil.com/", "//evil.com", "/\t/evil.com", "/\n/evil.com", "http://evil.com/", `/\evil.com`, ""} {
 		w := do(s, postForm(s, "/lang", url.Values{"lang": {"en"}, "next": {next}}))
 		if loc := w.Header().Get("Location"); loc != "/" {
 			t.Errorf("next %q: Location %q, want /", next, loc)
@@ -300,7 +300,9 @@ func TestI18nKeysComplete(t *testing.T) {
 	}
 
 	used := map[string]bool{}
-	tmplKey := regexp.MustCompile(`call \$?\.T "([^"]+)"`)
+	// call .T "k", call $.T "k" and call $r.T "k" (a variable holding the
+	// page data inside a {{define}} block).
+	tmplKey := regexp.MustCompile(`call (?:\$[a-zA-Z]*)?\.T "([^"]+)"`)
 	err = fs.WalkDir(templateFS, "templates", func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err

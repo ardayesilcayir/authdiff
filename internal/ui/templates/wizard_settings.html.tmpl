@@ -1,0 +1,131 @@
+{{define "content"}}
+<div class="wizard">
+{{template "steps" .}}
+<section class="wizard-body" aria-labelledby="step-h">
+<h1 id="step-h">{{call .T "wizard.step.settings"}}</h1>
+<p class="lead">{{call .T "settings.lead"}}</p>
+{{template "formerrors" .}}
+{{- $f := .Data.Form}}{{$e := .Data.Errors}}
+<form method="post" action="/p/{{.Data.P.Name}}/settings" id="settings-form">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+
+<div class="card-grid">
+<div class="field">
+<label for="rate">{{call .T "settings.rate"}}</label>
+<input type="number" id="rate" name="rate" value="{{$f.Rate}}" min="0.1" max="1000" step="any" required{{if index $e "rate"}} aria-invalid="true" aria-describedby="rate-err"{{end}}>
+{{- with index $e "rate"}}<p class="err" id="rate-err">{{call $.T .}}</p>{{else}}<p class="help">{{call .T "settings.rate.help"}}</p>{{end}}
+</div>
+<div class="field">
+<label for="concurrency">{{call .T "settings.concurrency"}}</label>
+<input type="number" id="concurrency" name="concurrency" value="{{$f.Concurrency}}" min="1" max="64" step="1" required{{if index $e "concurrency"}} aria-invalid="true" aria-describedby="concurrency-err"{{end}}>
+{{- with index $e "concurrency"}}<p class="err" id="concurrency-err">{{call $.T .}}</p>{{else}}<p class="help">{{call .T "settings.concurrency.help"}}</p>{{end}}
+</div>
+<div class="field">
+<label for="timeout">{{call .T "settings.timeout"}}</label>
+<input type="number" id="timeout" name="timeout" value="{{$f.Timeout}}" min="1" max="600" step="1" required{{if index $e "timeout"}} aria-invalid="true" aria-describedby="timeout-err"{{end}}>
+{{- with index $e "timeout"}}<p class="err" id="timeout-err">{{call $.T .}}</p>{{else}}<p class="help">{{call .T "settings.timeout.help"}}</p>{{end}}
+</div>
+</div>
+
+<fieldset class="danger{{if index $e "confirm"}} invalid{{end}}" id="destructive-box">
+<legend>{{call .T "settings.destructive.legend"}}</legend>
+<p>{{call .T "settings.destructive.body"}}</p>
+{{- if .Data.P.Demo}}
+<p class="warn-line">{{call .T "settings.destructive.demo"}}</p>
+{{- end}}
+<label class="check" for="destructive">
+<input type="checkbox" id="destructive" name="destructive" value="on"{{if $f.Destructive}} checked{{end}} data-confirm-dialog="destructive-dialog"{{if .Data.Form.AlreadyDestructive}} data-confirmed{{end}}>
+<span>{{call .T "settings.destructive.label"}}</span>
+</label>
+{{- if not .Data.Form.AlreadyDestructive}}
+<div class="field" id="confirm-field">
+<label for="confirm">{{call .T "settings.confirm.label"}}</label>
+<input type="text" id="confirm" name="confirm" autocomplete="off" spellcheck="false" aria-describedby="confirm-help{{if index $e "confirm"}} confirm-err{{end}}"{{if index $e "confirm"}} aria-invalid="true"{{end}}>
+<p class="help" id="confirm-help">{{call .T "settings.confirm.help"}}</p>
+{{- with index $e "confirm"}}<p class="err" id="confirm-err">{{call $.T .}}</p>{{end}}
+</div>
+{{- else}}
+<p class="hint">{{call .T "settings.destructive.on"}}</p>
+{{- end}}
+</fieldset>
+
+<dialog id="destructive-dialog" class="danger-dialog" aria-labelledby="dd-title">
+<h2 id="dd-title">{{call .T "settings.dialog.title"}}</h2>
+<p>{{call .T "settings.destructive.body"}}</p>
+{{- if .Data.P.Demo}}
+<p class="warn-line">{{call .T "settings.destructive.demo"}}</p>
+{{- end}}
+<div class="field">
+<label for="dialog-confirm">{{call .T "settings.confirm.label"}}</label>
+<input type="text" id="dialog-confirm" autocomplete="off" spellcheck="false">
+<p class="help">{{call .T "settings.confirm.help"}}</p>
+</div>
+<div class="actions">
+<button class="btn danger" type="button" data-dialog="ok">{{call .T "settings.dialog.ok"}}</button>
+<button class="btn" type="button" data-dialog="cancel">{{call .T "settings.dialog.cancel"}}</button>
+</div>
+</dialog>
+
+<details class="advanced"{{if or (index $e "threshold") (index $e "proxy") $f.Insecure $f.Proxy $f.Threshold $f.IgnoreFields (gt (len $f.Matrix) 0)}} open{{end}}>
+<summary>{{call .T "settings.advanced"}}</summary>
+<div class="card-grid">
+<div class="field">
+<label for="threshold">{{call .T "settings.threshold"}}</label>
+<input type="number" id="threshold" name="threshold" value="{{$f.Threshold}}" min="0.01" max="1" step="0.01" placeholder="0.85"{{if index $e "threshold"}} aria-invalid="true"{{end}}>
+{{- with index $e "threshold"}}<p class="err">{{call $.T .}}</p>{{else}}<p class="help">{{call .T "settings.threshold.help"}}</p>{{end}}
+</div>
+<div class="field">
+<label for="proxy">{{call .T "settings.proxy"}}</label>
+<input type="url" id="proxy" name="proxy" value="{{$f.Proxy}}" placeholder="http://127.0.0.1:8080" autocomplete="off" spellcheck="false"{{if index $e "proxy"}} aria-invalid="true"{{end}}>
+{{- with index $e "proxy"}}<p class="err">{{call $.T .}}</p>{{else}}<p class="help">{{call .T "settings.proxy.help"}}</p>{{end}}
+</div>
+</div>
+<div class="field">
+<label for="ignoreFields">{{call .T "settings.ignore"}}</label>
+<textarea id="ignoreFields" name="ignoreFields" rows="3" spellcheck="false" placeholder="$.requestId">{{$f.IgnoreFields}}</textarea>
+<p class="help">{{call .T "settings.ignore.help"}}</p>
+</div>
+<div class="insecure">
+<label class="check" for="insecure">
+<input type="checkbox" id="insecure" name="insecure" value="on"{{if $f.Insecure}} checked{{end}}>
+<span>{{call .T "settings.insecure"}}</span>
+</label>
+<p class="warn-line">{{call .T "settings.insecure.warn"}}</p>
+</div>
+
+<h3 id="matrix-h">{{call .T "settings.matrix"}}</h3>
+<p class="help">{{call .T "settings.matrix.help"}}</p>
+<div class="scroll">
+<table class="matrix" aria-labelledby="matrix-h">
+<thead><tr>
+<th scope="col">{{call .T "settings.matrix.pattern"}}</th>
+{{- range .Data.Form.Columns}}
+<th scope="col" class="num"><code>{{.}}</code></th>
+{{- end}}
+</tr></thead>
+<tbody id="matrix-rows">
+{{- range .Data.Form.Rows}}
+{{- $pre := printf "m%d." .Index}}
+<tr data-row data-index="{{.Index}}">
+<td><input type="text" name="{{$pre}}pattern" value="{{.Pattern}}" aria-label="{{call $.T "settings.matrix.pattern"}}" placeholder="GET /admin/**" spellcheck="false"{{if index $e (print $pre "pattern")}} aria-invalid="true"{{end}}>
+{{- with index $e (print $pre "pattern")}}<p class="err">{{call $.T .}}</p>{{end}}</td>
+{{- range .Cells}}
+<td class="num"><input type="checkbox" name="{{$pre}}allow" value="{{.Value}}" aria-label="{{.Value}}"{{if .Checked}} checked{{end}}></td>
+{{- end}}
+</tr>
+{{- end}}
+</tbody>
+</table>
+</div>
+<p><button class="btn small" type="button" id="add-row" data-rows="matrix-rows" hidden>{{call .T "settings.matrix.add"}}</button></p>
+</details>
+
+<div class="actions">
+<button class="btn primary" type="submit">{{call .T "settings.save_plan"}}</button>
+<button class="btn" type="submit" name="action" value="stay">{{call .T "settings.save_stay"}}</button>
+<a href="/p/{{.Data.P.Name}}/profiles">{{call .T "wizard.back"}}</a>
+</div>
+</form>
+</section>
+</div>
+{{end}}

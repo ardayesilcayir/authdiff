@@ -1,0 +1,81 @@
+{{define "content"}}
+<div class="wizard">
+{{template "steps" .}}
+<section class="wizard-body" aria-labelledby="step-h">
+<h1 id="step-h">{{call .T "wizard.step.endpoints"}}</h1>
+{{- $f := .Data.Form}}{{$e := .Data.Errors}}
+{{- if $f.NoTarget}}
+<div class="notice error" role="alert">
+<p>{{call .T "endpoints.err.no_target"}}</p>
+<p><a class="btn" href="/p/{{.Data.P.Name}}/target">{{call .T "endpoints.go_target"}}</a></p>
+</div>
+{{- else if $f.LoadErr}}
+<div class="notice error" role="alert">
+<p>{{call .T "endpoints.err.load"}}{{with $f.Spec}} <code>{{.}}</code>{{end}}</p>
+<pre class="detail">{{$f.LoadErr}}</pre>
+<p class="hint">{{call .T "endpoints.err.load_hint"}}</p>
+<p><a class="btn" href="/p/{{.Data.P.Name}}/target">{{call .T "endpoints.go_target"}}</a></p>
+</div>
+{{- else}}
+<p class="lead">{{call .T "endpoints.lead"}}</p>
+<p class="muted">{{call .T "endpoints.summary" (len $f.Rows) $f.Spec}}</p>
+{{- with $f.Title}}
+<p class="muted">{{call $.T "endpoints.spec_title" .}}</p>
+{{- end}}
+{{template "formerrors" .}}
+<form method="post" action="/p/{{.Data.P.Name}}/endpoints">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+{{- with index $e "ep"}}<p class="err" id="ep-err">{{call $.T .}}</p>{{end}}
+<div class="table-tools" hidden data-select-all="ep">
+<button class="btn small" type="button" data-select="all">{{call .T "endpoints.select_all"}}</button>
+<button class="btn small" type="button" data-select="none">{{call .T "endpoints.select_none"}}</button>
+</div>
+<div class="scroll">
+<table>
+<caption class="visually-hidden">{{call .T "endpoints.caption"}}</caption>
+<thead><tr>
+<th scope="col"><span class="visually-hidden">{{call .T "endpoints.col.include"}}</span></th>
+<th scope="col">{{call .T "endpoints.col.method"}}</th>
+<th scope="col" class="path">{{call .T "endpoints.col.path"}}</th>
+<th scope="col">{{call .T "endpoints.col.operation"}}</th>
+<th scope="col">{{call .T "endpoints.col.secured"}}</th>
+<th scope="col">{{call .T "endpoints.col.params"}}</th>
+<th scope="col">{{call .T "endpoints.col.tags"}}</th>
+</tr></thead>
+<tbody>
+{{- range $i, $r := $f.Rows}}
+<tr>
+<td><input type="checkbox" id="ep-{{$i}}" name="ep" value="{{$r.Key}}"{{if $r.Checked}} checked{{end}}></td>
+<td><label for="ep-{{$i}}" class="method m-{{$r.Method}}">{{$r.Method}}</label></td>
+<td class="path">{{$r.Path}}</td>
+<td>{{$r.OperationID}}</td>
+<td>{{if $r.Secured}}{{call $.T "endpoints.secured.yes"}}{{else}}<span class="muted">{{call $.T "endpoints.secured.no"}}</span>{{end}}</td>
+<td class="small">{{$r.Params}}</td>
+<td class="small">{{$r.Tags}}</td>
+</tr>
+{{- end}}
+</tbody>
+</table>
+</div>
+
+{{- if $f.Tags}}
+<fieldset class="group">
+<legend>{{call .T "endpoints.tags.legend"}}</legend>
+<p class="help">{{call .T "endpoints.tags.help"}}</p>
+<div class="checks">
+{{- range $i, $t := $f.Tags}}
+<label class="check" for="tag-{{$i}}"><input type="checkbox" id="tag-{{$i}}" name="tag" value="{{$t.Name}}"{{if $t.Checked}} checked{{end}}> <span>{{$t.Name}}</span></label>
+{{- end}}
+</div>
+</fieldset>
+{{- end}}
+
+<div class="actions">
+<button class="btn primary" type="submit">{{call .T "wizard.save_next"}}</button>
+<a href="/p/{{.Data.P.Name}}/target">{{call .T "wizard.back"}}</a>
+</div>
+</form>
+{{- end}}
+</section>
+</div>
+{{end}}

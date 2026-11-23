@@ -25,7 +25,11 @@ var staticRoot = func() fs.FS {
 	return sub
 }()
 
-const layoutFile = "templates/layout.html.tmpl"
+const (
+	layoutFile = "templates/layout.html.tmpl"
+	// partialsGlob holds shared {{define}} blocks parsed into every page.
+	partialsGlob = "templates/partials/*.tmpl"
+)
 
 // pageTemplate is one page parsed together with the shared layout.
 type pageTemplate struct{ t *template.Template }
@@ -44,8 +48,15 @@ type pageData struct {
 	Data    any
 }
 
+// templateFuncs are the helpers available to every template. pair passes
+// the page data together with an item to a {{template}} block:
+// {{template "card" (pair $ .)}}, then {{index . 0}} / {{index . 1}}.
+var templateFuncs = template.FuncMap{
+	"pair": func(a, b any) []any { return []any{a, b} },
+}
+
 // loadPages parses every templates/*.html.tmpl except the layout as its own
-// page: page "home" is home.html.tmpl + layout.
+// page: page "home" is home.html.tmpl + layout + the partials.
 func loadPages() (map[string]*pageTemplate, error) {
 	files, err := fs.Glob(templateFS, "templates/*.html.tmpl")
 	if err != nil {
@@ -57,7 +68,7 @@ func loadPages() (map[string]*pageTemplate, error) {
 			continue
 		}
 		name := strings.TrimSuffix(strings.TrimPrefix(f, "templates/"), ".html.tmpl")
-		t, err := template.New("layout.html.tmpl").ParseFS(templateFS, layoutFile, f)
+		t, err := template.New("layout.html.tmpl").Funcs(templateFuncs).ParseFS(templateFS, layoutFile, partialsGlob, f)
 		if err != nil {
 			return nil, fmt.Errorf("template %s: %w", name, err)
 		}

@@ -1,0 +1,19 @@
+{{define "steps"}}
+<nav class="stepnav" aria-label="{{call .T "wizard.steps.label"}}">
+<p class="crumb"><a href="/p/{{.Data.P.Name}}">{{.Data.P.Name}}</a>{{if .Data.P.Demo}} <span class="tag demo">{{call .T "project.demo"}}</span>{{end}}</p>
+<ol class="steps">
+{{- range .Data.Steps}}
+<li{{if .Current}} aria-current="step"{{else if .Done}} class="done"{{end}}><a href="{{.Href}}">{{call $.T .Key}}</a></li>
+{{- end}}
+</ol>
+<p class="hint">{{call .T "wizard.steps.autosave"}}</p>
+</nav>
+{{end}}
+
+{{define "formerrors"}}
+{{- if .Data.Errors}}
+<div class="notice error" role="alert" id="form-errors">
+<p>{{call .T "wizard.errors"}}</p>
+</div>
+{{- end}}
+{{end}}
