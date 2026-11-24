@@ -271,5 +271,6 @@
   "run.preliminary": "ön sonuç",
   "run.preliminary.hint": "Bulundukça gösterilir. Birleştirilmiş, sıralı son liste sonuçlar sayfasındadır.",
   "run.none_yet": "Henüz bulgu yok.",
-  "plan.destructive.safe": "Güvenli mod: yıkıcı işaretli %d istek authdiff'ten çıkmadan engellenir ve engellenen olarak sayılır."
+  "plan.destructive.safe": "Güvenli mod: yıkıcı işaretli %d istek authdiff'ten çıkmadan engellenir ve engellenen olarak sayılır.",
+  "run.back_plan": "Plana dön"
 }

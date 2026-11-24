@@ -271,5 +271,6 @@
   "run.preliminary": "preliminary",
   "run.preliminary.hint": "Shown as they are found. The final list, merged and sorted, is on the results page.",
   "run.none_yet": "No findings yet.",
-  "plan.destructive.safe": "Safe mode: the %d requests marked destructive are blocked before they leave authdiff and count as blocked."
+  "plan.destructive.safe": "Safe mode: the %d requests marked destructive are blocked before they leave authdiff and count as blocked.",
+  "run.back_plan": "Back to the plan"
 }

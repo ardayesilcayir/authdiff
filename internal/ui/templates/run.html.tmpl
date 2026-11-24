@@ -1,8 +1,25 @@
 {{define "head"}}
+{{- if not .Data.Run.Finished}}
 <noscript><meta http-equiv="refresh" content="3"></noscript>
+{{- end}}
 {{- end}}
 {{define "content"}}
 {{- $d := .Data}}{{$p := $d.P}}{{$g := $d.Run.Progress}}
+{{- if $d.Run.Finished}}
+<section class="run">
+<div class="intro">
+<h1>{{call .T "run.title"}} <span class="muted">· {{$p.Name}}</span></h1>
+</div>
+<div class="notice error" role="alert">
+<p class="err">{{call .T "run.status.error"}}</p>
+<pre class="detail">{{$d.Run.Message}}</pre>
+</div>
+<div class="actions">
+<a class="btn primary" href="/p/{{$p.Name}}/plan">{{call .T "run.back_plan"}}</a>
+<a class="btn" href="/p/{{$p.Name}}/target">{{call .T "plan.err.fix"}}</a>
+</div>
+</section>
+{{- else}}
 <section class="run" data-events="{{$d.Events}}" data-phase-label="{{call .T "run.phase.label"}}" data-done-label="{{call .T "run.status.done"}}" data-stopped-label="{{call .T "run.status.stopped"}}" data-failed-label="{{call .T "run.status.failed"}}" data-error-label="{{call .T "run.status.error"}}" data-lost-label="{{call .T "run.status.lost"}}">
 <div class="intro">
 <h1>{{call .T "run.title"}} <span class="muted">· {{$p.Name}}</span></h1>
@@ -36,4 +53,5 @@
 <p class="muted" data-field="empty"{{if $d.Run.Findings}} hidden{{end}}>{{call .T "run.none_yet"}}</p>
 </section>
 </section>
+{{- end}}
 {{end}}

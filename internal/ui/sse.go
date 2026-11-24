@@ -89,14 +89,20 @@ func (s *Server) handleStopRun(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusNotFound)
 		return
 	}
-	if err := s.runs.Stop(id); errors.Is(err, ErrNotRunning) {
-		s.renderError(w, r, http.StatusNotFound)
+	// A run that finished meanwhile is not an error: its page shows the
+	// outcome (results or the reason it failed).
+	if err := s.runs.Stop(id); err != nil && !errors.Is(err, ErrNotRunning) {
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	runPath := "/p/" + v.Project + "/runs/" + id
 	if r.Header.Get("X-CSRF-Token") != "" {
+		next := runPath
+		if v, _ := s.runs.view(id); v.Final == "done" {
+			next = runPath + "/results"
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		_ = json.NewEncoder(w).Encode(map[string]string{"results": runPath + "/results"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"results": next})
 		return
 	}
 	redirect(w, r, runPath)

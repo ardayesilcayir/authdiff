@@ -107,6 +107,9 @@ type RunError struct {
 // scanFunc is authdiff.Scan; tests may replace it.
 type scanFunc func(context.Context, authdiff.ScanOptions) (*authdiff.Result, error)
 
+// writeFunc is report.Write; tests may replace it.
+type writeFunc func(dir string, formats []string, r *authdiff.Result, stdout io.Writer, color bool) ([]string, error)
+
 // RunManager runs at most one scan at a time, in the background context of
 // the server (not of the HTTP request that started it), and fans its
 // progress out to subscribers.
@@ -116,6 +119,7 @@ type RunManager struct {
 	version string
 	log     *slog.Logger
 	scan    scanFunc
+	write   writeFunc
 	now     func() time.Time
 
 	mu   sync.Mutex
@@ -144,7 +148,7 @@ func newRunManager(version string, log *slog.Logger) *RunManager {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &RunManager{
 		ctx: ctx, cancel: cancel, version: version, log: log,
-		scan: authdiff.Scan, now: time.Now, runs: map[string]*run{},
+		scan: authdiff.Scan, write: report.Write, now: time.Now, runs: map[string]*run{},
 	}
 }
 
@@ -270,11 +274,17 @@ func (m *RunManager) persist(r *run, res *authdiff.Result, scanErr error) Event 
 		if scanErr == nil {
 			scanErr = errors.New("the scan returned no result")
 		}
+		m.log.Warn("scan failed without results", "project", r.project, "run", r.id, "err", scanErr)
 		_ = os.Remove(r.dir) // only if empty
 		return Event{Type: "error", Data: RunError{Message: scanErr.Error()}}
 	}
-	if _, err := report.Write(r.dir, runFormats, res, io.Discard, false); err != nil {
+	if _, err := m.write(r.dir, runFormats, res, io.Discard, false); err != nil {
 		m.log.Error("write scan results", "run", r.id, "err", err)
+		// No half-written results.json for the run page to forward to.
+		for _, f := range []string{"results.json", "results.sarif", "report.html"} {
+			_ = os.Remove(filepath.Join(r.dir, f))
+		}
+		_ = os.Remove(r.dir) // only if empty
 		return Event{Type: "error", Data: RunError{Message: "could not save the results: " + err.Error()}}
 	}
 	d := RunDone{
@@ -479,10 +489,13 @@ func (m *RunManager) get(id string) *run {
 	return m.runs[id]
 }
 
-// runView is what the live page shows of a run.
+// runView is what the live page shows of a run. Final is the type of the
+// last event ("done" or "error") once Finished; Message is the error.
 type runView struct {
 	ID, Project string
 	Finished    bool
+	Final       string
+	Message     string
 	Progress    RunProgress
 	Findings    []RunFinding // newest first
 }
@@ -496,6 +509,12 @@ func (m *RunManager) view(id string) (runView, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	v := runView{ID: r.id, Project: r.project, Finished: r.final != nil, Progress: r.snapshot()}
+	if r.final != nil {
+		v.Final = r.final.Type
+		if e, ok := r.final.Data.(RunError); ok {
+			v.Message = e.Message
+		}
+	}
 	for i := len(r.findings) - 1; i >= 0; i-- {
 		v.Findings = append(v.Findings, r.findings[i])
 	}

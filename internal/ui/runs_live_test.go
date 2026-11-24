@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ardayesilcayir/authdiff/internal/finding"
 	"github.com/ardayesilcayir/authdiff/pkg/authdiff"
 )
 
@@ -193,9 +194,8 @@ func TestStopWritesPartial(t *testing.T) {
 	if d, ok := last.Data.(RunDone); last.Type != "done" || !ok || d.Status != "stopped" {
 		t.Errorf("last event %+v, want done/stopped", last)
 	}
-	if w := do(s, postForm(s, "/api/runs/"+id+"/stop", nil)); w.Code != http.StatusNotFound {
-		t.Errorf("second stop: status %d, want 404", w.Code)
-	}
+	// Stopping a run that already finished goes to its page.
+	wantRedirect(t, do(s, postForm(s, "/api/runs/"+id+"/stop", nil)), "/p/"+runProject+"/runs/"+id)
 	// The finished run's page goes to its results.
 	wantRedirect(t, do(s, req(s, http.MethodGet, "/p/"+runProject+"/runs/"+id, nil, true)),
 		"/p/"+runProject+"/runs/"+id+"/results")
@@ -399,5 +399,71 @@ func TestRunErrorAndHook(t *testing.T) {
 	waitRun(t, s, id)
 	if v, ok := s.runs.view(id); !ok || !v.Finished {
 		t.Errorf("view %+v", v)
+	}
+}
+
+// A scan that fails without a result (spec unreachable) keeps its run page:
+// 200 with the reason, no stop form and no refresh, never a redirect to
+// results that cannot exist.
+func TestRunPageShowsScanError(t *testing.T) {
+	s := runServer(t, Options{})
+	api := newRunAPI(t, false, 0)
+	p := runFixture(t, s, api, false, true)
+	cfg, err := BuildConfig(p, s.secrets, s.store.Dir(p.Name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.runs.scan = func(context.Context, authdiff.ScanOptions) (*authdiff.Result, error) {
+		return nil, errors.New("load spec: connection refused")
+	}
+	id, err := s.runs.Start(p, cfg, s.store.Dir(p.Name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitRun(t, s, id)
+	w := do(s, req(s, http.MethodGet, "/p/"+p.Name+"/runs/"+id, nil, true))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d (Location %q), want 200", w.Code, w.Header().Get("Location"))
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "load spec: connection refused") || !strings.Contains(body, "The scan could not run") {
+		t.Error("run page lacks the error")
+	}
+	for _, bad := range []string{`http-equiv="refresh"`, `action="/api/runs/` + id + `/stop"`, `data-events=`} {
+		if strings.Contains(body, bad) {
+			t.Errorf("failed run page contains %q", bad)
+		}
+	}
+	// Stop on it goes to the same page.
+	wantRedirect(t, do(s, postForm(s, "/api/runs/"+id+"/stop", nil)), "/p/"+p.Name+"/runs/"+id)
+}
+
+// When writing the reports fails, no partial results.json is left for the
+// run page's disk fallback to redirect to.
+func TestRunWriteFailureLeavesNoResults(t *testing.T) {
+	s := runServer(t, Options{})
+	api := newRunAPI(t, false, 0)
+	p := runFixture(t, s, api, false, true)
+	cfg, err := BuildConfig(p, s.secrets, s.store.Dir(p.Name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.runs.write = func(dir string, _ []string, _ *finding.Result, _ io.Writer, _ bool) ([]string, error) {
+		if err := os.WriteFile(filepath.Join(dir, "results.json"), []byte("{"), 0o600); err != nil {
+			return nil, err
+		}
+		return nil, errors.New("disk full")
+	}
+	id, err := s.runs.Start(p, cfg, s.store.Dir(p.Name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitRun(t, s, id)
+	if _, err := os.Stat(filepath.Join(s.store.RunsDir(p.Name), id, "results.json")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("results.json left behind: %v", err)
+	}
+	w := do(s, req(s, http.MethodGet, "/p/"+p.Name+"/runs/"+id, nil, true))
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "disk full") {
+		t.Errorf("status %d, want 200 with the write error", w.Code)
 	}
 }

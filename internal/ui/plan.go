@@ -202,7 +202,7 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusNotFound)
 		return
 	}
-	if v.Finished {
+	if v.Final == "done" {
 		redirect(w, r, results)
 		return
 	}
