@@ -39,6 +39,23 @@ func (s *Secrets) Set(project, profile string, sec Secret) {
 	s.m[project][profile] = sec
 }
 
+// setIfAbsent sets project/profile's credentials unless memory already
+// holds an entry for it (even an empty one).
+func (s *Secrets) setIfAbsent(project, profile string, sec Secret) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.m[project][profile]; ok {
+		return
+	}
+	if s.m == nil {
+		s.m = map[string]map[string]Secret{}
+	}
+	if s.m[project] == nil {
+		s.m[project] = map[string]Secret{}
+	}
+	s.m[project][profile] = sec
+}
+
 // Get returns the credentials of project/profile held in memory.
 func (s *Secrets) Get(project, profile string) (Secret, bool) {
 	s.mu.Lock()

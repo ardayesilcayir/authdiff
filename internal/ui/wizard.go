@@ -88,7 +88,8 @@ func redirect(w http.ResponseWriter, r *http.Request, p string) {
 	http.Redirect(w, r, localPath(p), http.StatusSeeOther) //nolint:gosec // G710: localPath allows only paths on this server
 }
 
-// project loads the {name} project, answering 404 for an invalid or
+// project loads the {name} project (for the demo, also its lab tokens from
+// disk into memory), answering 404 for an invalid or
 // unknown name and 500 for other errors.
 func (s *Server) project(w http.ResponseWriter, r *http.Request) (*Project, bool) {
 	name := r.PathValue("name")
@@ -105,6 +106,10 @@ func (s *Server) project(w http.ResponseWriter, r *http.Request) (*Project, bool
 		s.opts.Log.Error("load project", "project", name, "err", err)
 		s.renderError(w, r, http.StatusInternalServerError)
 		return nil, false
+	}
+	// After a restart the demo's lab tokens come back from disk.
+	if err := loadDemoSecrets(s.store, s.secrets, p); err != nil {
+		s.opts.Log.Warn("load demo secrets", "project", name, "err", err)
 	}
 	return p, true
 }

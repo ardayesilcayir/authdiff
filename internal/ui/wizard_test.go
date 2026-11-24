@@ -670,3 +670,32 @@ func TestDynamicI18nKeys(t *testing.T) {
 		}
 	}
 }
+
+// The demo's lab tokens are the one secret on disk (demo-secrets.json): a
+// restarted server reads them back, so the demo needs no credentials.
+func TestDemoSecretsSurviveRestart(t *testing.T) {
+	dir := t.TempDir()
+	s := runServer(t, Options{ProjectsDir: dir, LabURL: "http://127.0.0.1:8000"})
+	wantRedirect(t, do(s, postForm(s, "/demo", nil)), "/p/"+DemoName+"/plan")
+
+	// A new Server and Secrets on the same directory: a restart.
+	s2 := runServer(t, Options{ProjectsDir: dir, LabURL: "http://127.0.0.1:8000"})
+	if body := do(s2, req(s2, http.MethodGet, "/p/"+DemoName, nil, true)).Body.String(); strings.Contains(body, template.HTMLEscapeString(s2.cat["en"]["profiles.warn.missing"])) {
+		t.Error("overview after restart asks for credentials")
+	}
+	s2.runs.scan = func(context.Context, authdiff.ScanOptions) (*authdiff.Result, error) {
+		return nil, errors.New("lab not running")
+	}
+	w := do(s2, postForm(s2, "/p/"+DemoName+"/scan", nil))
+	loc := w.Header().Get("Location")
+	if w.Code != http.StatusSeeOther || !strings.HasPrefix(loc, "/p/"+DemoName+"/runs/") {
+		t.Fatalf("scan after restart: status %d Location %q, want a run", w.Code, loc)
+	}
+	waitRun(t, s2, strings.TrimPrefix(loc, "/p/"+DemoName+"/runs/"))
+
+	// A credential cleared by hand stays cleared (memory wins over the file).
+	s2.secrets.Set(DemoName, "alice", Secret{})
+	if body := do(s2, req(s2, http.MethodGet, "/p/"+DemoName, nil, true)).Body.String(); !strings.Contains(body, "<code>alice</code>") {
+		t.Error("cleared demo credential was reloaded from disk")
+	}
+}

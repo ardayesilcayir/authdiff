@@ -53,7 +53,7 @@
 </form>
 {{- end}}
 <a class="btn" href="/p/{{$p.Name}}/settings">{{call .T "project.settings"}}</a>
-<a class="btn" href="/p/{{$p.Name}}/export.zip" download>{{call .T "project.export"}}</a>
+<a class="btn" href="/p/{{$p.Name}}/export.zip">{{call .T "project.export"}}</a>
 </div>
 {{- if .Data.History}}
 <div class="scroll">

@@ -159,6 +159,31 @@ func EnsureDemo(st *Store, sec *Secrets, labURL string) (*Project, error) {
 	return p, nil
 }
 
+// loadDemoSecrets puts the lab tokens of the demo's demo-secrets.json into
+// sec for each profile that has no entry in memory, so the demo keeps
+// working after a server restart. A credential set or cleared in this
+// session wins over the file. A missing file loads nothing.
+func loadDemoSecrets(st *Store, sec *Secrets, p *Project) error {
+	if !p.Demo {
+		return nil
+	}
+	b, err := os.ReadFile(filepath.Join(st.Dir(p.Name), demoSecretsFile)) //nolint:gosec // G304: fixed file name in the validated project dir
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("demo secrets: %w", err)
+	}
+	var secrets map[string]Secret
+	if err := json.Unmarshal(b, &secrets); err != nil {
+		return fmt.Errorf("demo secrets: %w", err)
+	}
+	for name, s := range secrets {
+		sec.setIfAbsent(p.Name, name, s)
+	}
+	return nil
+}
+
 // projectFromConfig converts a parsed config into a demo Project without
 // credentials. Output and rules settings have no UI counterpart.
 func projectFromConfig(c *config.Config) *Project {

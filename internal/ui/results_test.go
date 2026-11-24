@@ -533,3 +533,19 @@ func TestSeverityKeys(t *testing.T) {
 		}
 	}
 }
+
+// The export link has no download attribute: with it, browsers save the
+// 422 explanation page as a file instead of showing it.
+func TestExportLinkShowsErrors(t *testing.T) {
+	s := resultsServer(t)
+	noDownload := regexp.MustCompile(`export\.zip"[^>]*\bdownload\b`)
+	for _, page := range []string{resultsURL, "/p/" + resProject} {
+		_, body := get(t, s, page)
+		if !strings.Contains(body, `href="/p/`+resProject+`/export.zip"`) {
+			t.Errorf("%s: export link missing", page)
+		}
+		if noDownload.MatchString(body) {
+			t.Errorf("%s: export link has a download attribute", page)
+		}
+	}
+}
