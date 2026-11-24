@@ -37,7 +37,7 @@ func req(s *Server, method, target string, body io.Reader, authed bool) *http.Re
 	r := httptest.NewRequest(method, target, body)
 	r.Host = "127.0.0.1:7465"
 	if authed {
-		r.AddCookie(&http.Cookie{Name: sessionCookie, Value: s.key}) //nolint:gosec // G124: request cookie in a test
+		r.AddCookie(&http.Cookie{Name: s.cookieName(), Value: s.key}) //nolint:gosec // G124: request cookie in a test
 	}
 	return r
 }

@@ -84,13 +84,29 @@ func (s *Server) newPage(r *http.Request, titleKey string) *pageData {
 		T:       translator(s.cat[lang]),
 		Lang:    lang,
 		Version: s.opts.Version,
-		Path:    r.URL.RequestURI(),
+		Path:    langNext(r),
 	}
 	if authed(r) {
 		pd.CSRF = s.csrf
 	}
 	pd.Title = pd.T(titleKey)
 	return pd
+}
+
+// langNext is where the language form returns to: the request's own path
+// for a GET, else a GET page, since a page rendered for a POST (an error,
+// the busy page) has a POST-only path: the project overview for a path
+// under /p/{name}/, otherwise the home page.
+func langNext(r *http.Request) string {
+	if r.Method == http.MethodGet || r.Method == http.MethodHead {
+		return r.URL.RequestURI()
+	}
+	if rest, ok := strings.CutPrefix(r.URL.Path, "/p/"); ok {
+		if name, _, _ := strings.Cut(rest, "/"); ValidName(name) {
+			return "/p/" + name
+		}
+	}
+	return "/"
 }
 
 // render executes page into a buffer first so a template error becomes a

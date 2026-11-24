@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -416,4 +417,26 @@ func TestSecondScanConflict(t *testing.T) {
 	if s.runs.Active() != "" {
 		t.Error("run still active after it finished")
 	}
+}
+
+// A project cannot be deleted while its scan runs: the scan would go on
+// and recreate runs/ in the deleted directory.
+func TestDeleteWhileScanning(t *testing.T) {
+	s := runServer(t, Options{})
+	api := newRunAPI(t, true, 0)
+	runFixture(t, s, api, false, true)
+	id := startScan(t, s)
+	w := do(s, postForm(s, "/p/"+runProject+"/delete", url.Values{"sure": {"yes"}}))
+	if w.Code != http.StatusConflict {
+		t.Fatalf("delete while scanning: status %d, want 409", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), `href="/p/`+runProject+`/runs/`+id+`"`) {
+		t.Error("409 page does not link the running scan")
+	}
+	if _, err := s.store.Get(runProject); err != nil {
+		t.Errorf("project gone: %v", err)
+	}
+	api.open()
+	waitRun(t, s, id)
+	wantRedirect(t, do(s, postForm(s, "/p/"+runProject+"/delete", url.Values{"sure": {"yes"}})), "/projects")
 }

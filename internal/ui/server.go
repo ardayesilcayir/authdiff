@@ -136,6 +136,11 @@ func New(o Options) (*Server, error) {
 
 // routes registers this package's handlers. Later handlers use the same
 // method-aware ServeMux patterns, e.g. "GET /p/{name}/target".
+//
+// Invariant: no GET (or HEAD) handler changes state. Every change is a
+// POST and passes the Origin and CSRF checks in secure(). SameSite=Strict
+// alone would not protect it: another server on 127.0.0.1 (any port) is
+// same-site, so its pages send our cookie with their requests.
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /{$}", s.handleHome)
 	s.mux.HandleFunc("GET /healthz", s.handleHealthz)

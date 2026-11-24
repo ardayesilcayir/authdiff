@@ -267,6 +267,11 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 		s.render(w, http.StatusUnprocessableEntity, "project", s.overview(r, p, formErrors{"sure": "project.err.sure"}))
 		return
 	}
+	// A running scan would go on writing into the deleted directory.
+	if id, project := s.runs.active(); id != "" && project == p.Name {
+		s.renderBusy(w, r)
+		return
+	}
 	if err := os.RemoveAll(s.store.Dir(p.Name)); err != nil {
 		s.opts.Log.Error("delete project", "project", p.Name, "err", err)
 		s.renderError(w, r, http.StatusInternalServerError)

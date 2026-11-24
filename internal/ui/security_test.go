@@ -3,6 +3,7 @@ package ui
 import (
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -23,7 +24,7 @@ func TestNoSessionIs401(t *testing.T) {
 	}
 	// A wrong cookie is no session either.
 	r := req(s, http.MethodGet, "/", nil, false)
-	r.AddCookie(&http.Cookie{Name: sessionCookie, Value: strings.Repeat("0", 64)}) //nolint:gosec // G124: request cookie in a test
+	r.AddCookie(&http.Cookie{Name: s.cookieName(), Value: strings.Repeat("0", 64)}) //nolint:gosec // G124: request cookie in a test
 	if w := do(s, r); w.Code != http.StatusUnauthorized {
 		t.Errorf("wrong cookie: status %d", w.Code)
 	}
@@ -47,7 +48,7 @@ func TestKeyLoginSetsCookieAndRedirects(t *testing.T) {
 		t.Errorf("Location = %q, want /?x=1", loc)
 	}
 	set := w.Header().Get("Set-Cookie")
-	for _, want := range []string{sessionCookie + "=" + s.key, "Path=/", "HttpOnly", "SameSite=Strict"} {
+	for _, want := range []string{s.cookieName() + "=" + s.key, "Path=/", "HttpOnly", "SameSite=Strict"} {
 		if !strings.Contains(set, want) {
 			t.Errorf("Set-Cookie %q lacks %q", set, want)
 		}
@@ -216,5 +217,57 @@ func TestReferrerPolicyIsSameOrigin(t *testing.T) {
 	r.Header.Set("Referer", "http://127.0.0.1:7465/")
 	if w := do(s, r); w.Code != http.StatusForbidden {
 		t.Errorf("Origin null: status %d, want 403", w.Code)
+	}
+}
+
+// Each instance has its own cookie name (authdiff_session_<port>): browsers
+// do not separate cookies by port, so a shared name let a login on one
+// instance log the other out.
+func TestSessionCookiePerPort(t *testing.T) {
+	s := testServer(t, Options{})
+	w := do(s, req(s, http.MethodGet, "/?key="+s.key, nil, false))
+	if c := w.Result().Cookies(); len(c) != 1 || c[0].Name != "authdiff_session_7465" {
+		t.Fatalf("cookies %v, want authdiff_session_7465", c)
+	}
+	r := req(s, http.MethodGet, "/healthz", nil, false)
+	r.AddCookie(&http.Cookie{Name: "authdiff_session", Value: s.key}) //nolint:gosec // G124: request cookie in a test
+	if w := do(s, r); w.Code != http.StatusUnauthorized {
+		t.Errorf("unsuffixed cookie: status %d, want 401", w.Code)
+	}
+	if s2 := testServer(t, Options{Port: 7466}); s2.cookieName() != "authdiff_session_7466" {
+		t.Errorf("port 7466: cookie name %q", s2.cookieName())
+	}
+}
+
+// A page rendered for a POST (an error or a busy page) points the language
+// form at a GET page: the project overview under /p/{name}/, else /.
+func TestLangNextAfterPost(t *testing.T) {
+	s := testServer(t, Options{})
+	newProject(t, s, "a")
+	next := func(body string) string {
+		m := regexp.MustCompile(`name="next" value="([^"]*)"`).FindStringSubmatch(body)
+		if m == nil {
+			return "<none>"
+		}
+		return m[1]
+	}
+	// 422 from the delete form.
+	if got := next(do(s, postForm(s, "/p/a/delete", nil)).Body.String()); got != "/p/a" {
+		t.Errorf("422 delete: next %q, want /p/a", got)
+	}
+	// 403 from the security checks, before routing.
+	r := postForm(s, "/p/a/scan", nil)
+	r.Header.Set("Origin", "http://evil.example")
+	if got := next(do(s, r).Body.String()); got != "/p/a" {
+		t.Errorf("403 scan: next %q, want /p/a", got)
+	}
+	// A POST outside a project.
+	s.opts.LabURL = "::bad"
+	if got := next(do(s, postForm(s, "/demo", nil)).Body.String()); got != "/" {
+		t.Errorf("500 demo: next %q, want /", got)
+	}
+	// A GET keeps its own path and query.
+	if got := next(do(s, req(s, http.MethodGet, "/p/a/target?x=1", nil, true)).Body.String()); got != "/p/a/target?x=1" {
+		t.Errorf("GET: next %q", got)
 	}
 }

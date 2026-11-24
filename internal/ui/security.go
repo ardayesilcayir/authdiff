@@ -12,7 +12,9 @@ import (
 )
 
 const (
-	sessionCookie = "authdiff_session"
+	// sessionCookiePrefix + the port is the session cookie's name: cookies
+	// are not separated by port, so two instances need distinct names.
+	sessionCookiePrefix = "authdiff_session_"
 	// cspHeader is the exact policy from the design (§7, rule 4).
 	cspHeader = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
 	// maxRequestBody caps every request body: a 10 MiB spec upload plus
@@ -108,7 +110,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request, q url.Values) {
 		return
 	}
 	http.SetCookie(w, &http.Cookie{ //nolint:gosec // G124: plain-http loopback server; Secure would drop the cookie
-		Name:     sessionCookie,
+		Name:     s.cookieName(),
 		Value:    s.key,
 		Path:     "/",
 		HttpOnly: true,
@@ -122,8 +124,13 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request, q url.Values) {
 	http.Redirect(w, r, localPath(loc), http.StatusSeeOther) //nolint:gosec // G710: localPath allows only paths on this server
 }
 
+// cookieName is the session cookie's name, authdiff_session_<port>.
+func (s *Server) cookieName() string {
+	return fmt.Sprintf("%s%d", sessionCookiePrefix, s.port.Load())
+}
+
 func (s *Server) validSession(r *http.Request) bool {
-	c, err := r.Cookie(sessionCookie)
+	c, err := r.Cookie(s.cookieName())
 	return err == nil && equalSecret(c.Value, s.key)
 }
 
