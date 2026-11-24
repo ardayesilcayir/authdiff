@@ -24,8 +24,8 @@ jobs:
           go-version: stable
           check-latest: true
 
-      # The lab keeps its data in memory and is reseeded on every start.
-      # `make e2e` recreates the container, so the test always sees a fresh lab.
+      # The lab keeps its data in memory and is reseeded on every start, so
+      # the first test sees a fresh lab.
       - name: Start vuln-lab
         run: docker compose up -d --build --wait vuln-lab
       - name: Wait for health
@@ -37,10 +37,17 @@ jobs:
           docker compose logs vuln-lab
           exit 1
 
-      - name: End-to-end test (fresh lab, destructive)
-        run: make e2e
+      # Both e2e tests scan destructively, so each runs alone against a
+      # freshly recreated lab.
+      - name: End-to-end test, CLI (fresh lab, destructive)
+        run: go test -tags e2e -count=1 -v -run TestVulnLab ./test/e2e/...
 
-      # The e2e scan mutated the lab; recreate it for the SARIF scan.
+      - name: Restart vuln-lab for the UI test
+        run: docker compose up -d --force-recreate --wait vuln-lab
+      - name: End-to-end test, web UI (fresh lab, destructive)
+        run: go test -tags e2e -count=1 -v -run TestUIDemoMatchesOracle ./test/e2e/...
+
+      # The e2e scans mutated the lab; recreate it for the SARIF scan.
       - name: Restart vuln-lab
         run: make lab-restart
 

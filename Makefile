@@ -3,7 +3,7 @@ COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 
-.PHONY: build test cover lint lab lab-restart lab-stop demo e2e
+.PHONY: build test cover lint lab lab-restart lab-stop demo e2e e2e-cli e2e-ui ui
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o dist/authdiff ./cmd/authdiff
@@ -36,6 +36,19 @@ demo: build lab
 	set -a; . ./examples/vuln-lab.env; set +a; \
 	./dist/authdiff scan -c examples/authdiff.yaml; s=$$?; [ $$s -le 1 ]
 
-# End-to-end test: always against a freshly recreated lab.
-e2e: lab-restart
-	go test -tags e2e -count=1 -v ./test/e2e/...
+# End-to-end tests: each one scans destructively, so each gets its own
+# freshly recreated lab. Never run both in one `go test` invocation.
+e2e: e2e-cli e2e-ui
+
+# Make runs a shared prerequisite only once, so each recipe restarts the lab.
+e2e-cli:
+	$(MAKE) lab-restart
+	go test -tags e2e -count=1 -v -run TestVulnLab ./test/e2e/...
+
+e2e-ui:
+	$(MAKE) lab-restart
+	go test -tags e2e -count=1 -v -run TestUIDemoMatchesOracle ./test/e2e/...
+
+# Start the local web interface (127.0.0.1 only; opens the browser).
+ui:
+	go run ./cmd/authdiff ui
