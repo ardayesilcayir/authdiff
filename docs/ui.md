@@ -91,7 +91,8 @@ it is built for one user on one machine.
   `127.0.0.1:<port>` or `localhost:<port>` get `421` (DNS rebinding).
 - **Session key.** Each start generates a random 32-byte key. The `?key=`
   link sets an `HttpOnly; SameSite=Strict; Path=/` cookie named
-  `authdiff_session` and redirects to the same page without the key. Every
+  `authdiff_session_<port>` (one name per port, so two instances do not log
+  each other out) and redirects to the same page without the key. Every
   request without that cookie gets `401`. Treat the printed link like a
   password: anyone who has it while the server runs can use the interface. A
   restart makes the old link and cookie useless.
@@ -122,7 +123,7 @@ Tokens, usernames and passwords are kept in the server's memory only. They are
 never written to disk, to logs or to browser storage, and the server never
 sends them back to the browser: a saved credential shows as `•••• ` plus its
 last four characters, and leaving the field empty keeps the current value.
-The saved config uses `${env:...}` placeholders instead.
+The exported config uses `${env:...}` placeholders instead.
 
 The consequence: **after the server restarts, the credentials are gone.**
 Opening a project then asks for the missing ones again. Alternatively set them
@@ -139,7 +140,8 @@ AUTHDIFF_<PROFILE>_PASSWORD     # basic auth
 `A-Z0-9` replaced by `_` (`staging-admin` → `AUTHDIFF_STAGING_ADMIN_TOKEN`).
 
 The only exception is the demo project: the lab's tokens are fake and already
-public in this repository, so they are written to its `demo-secrets.json`.
+public in this repository, so they are written to its `demo-secrets.json`,
+and the demo reads them back from there after a restart.
 
 ## Projects
 
@@ -158,16 +160,18 @@ match `^[a-z0-9][a-z0-9-]{0,62}$`. One project looks like this:
 ```
 <projects-dir>/<name>/
   project.json        # the project as the interface sees it (source of truth)
-  authdiff.yaml       # generated config, credentials as ${env:...} placeholders
-  spec.<yaml|json>    # an uploaded spec; a spec URL stays in the config
+  spec.<yaml|json>    # an uploaded spec; a spec URL stays in project.json
   .authdiff-ignore    # suppressed findings
-  runs/<time>/        # results.json, results.sarif, report.html of each scan
+  demo-secrets.json   # demo project only: the lab's fake tokens
+  runs/<time>/        # results.json, results.sarif, report.html and
+                      # status.json (completed, stopped or failed) of each scan
 ```
 
-`project.json` is the source of truth. The interface regenerates
-`authdiff.yaml` from it when the settings form a valid config; **editing
-`authdiff.yaml` in the project directory by hand is not picked up** by the
-interface and is overwritten on the next save. Importing an existing
+`project.json` is the source of truth; the project directory holds no
+`authdiff.yaml`. The config is built from `project.json` in memory for each
+scan, and an `authdiff.yaml` is generated only for the export zip (see
+below), when the settings form a valid config. **Editing an exported
+`authdiff.yaml` is not picked up** by the interface. Importing an existing
 `authdiff.yaml` into the interface is not supported yet.
 
 ## Export for the CLI and CI
