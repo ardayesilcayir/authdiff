@@ -106,7 +106,10 @@ it is built for one user on one machine.
   `403`.
 - **Headers.** Every response has a strict Content-Security-Policy (no inline
   script, no external resources, no framing), `X-Content-Type-Options:
-  nosniff`, `Referrer-Policy: no-referrer` and `Cache-Control: no-store`.
+  nosniff`, `Referrer-Policy: same-origin` and `Cache-Control: no-store`.
+  (`same-origin` rather than `no-referrer`: under `no-referrer` browsers send
+  `Origin: null` and no Referer on form POSTs, so the Origin check would
+  reject every form; other origins still receive no Referer.)
   Content from the target API (bodies, headers, spec paths) is escaped by
   `html/template` and only ever set as text by the page scripts.
 - **Same safety as the CLI.** Scans use `pkg/authdiff` and the same transport:

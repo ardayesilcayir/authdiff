@@ -73,7 +73,7 @@ authdiff ui [--port 7465] [--no-open] [--projects-dir <dizin>]
 1. Her istekte geçerli oturum çerezi zorunlu; yoksa 401 ve "terminaldeki bağlantıyı kullanın" sayfası.
 2. `Host` başlığı yalnızca `127.0.0.1:<port>` ya da `localhost:<port>` olabilir; değilse 421 (DNS rebinding koruması).
 3. Durum değiştiren her istek `POST`; `Origin` (yoksa `Referer`) kendi adresimiz olmalı ve formda/başlıkta oturuma bağlı bir CSRF token'ı bulunmalı.
-4. Tüm yanıtlarda `Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store`.
+4. Tüm yanıtlarda `Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin` (`no-referrer` değil: o politikada tarayıcı form POST'larında `Origin: null` gönderir ve Referer göndermez, Origin kontrolü her formu reddeder; `same-origin` başka origin'lere yine hiçbir şey göndermez), `Cache-Control: no-store`.
 5. Hedef API'den gelen her içerik (yanıt gövdeleri, başlıklar, spec'teki path/operationId) yalnızca `html/template` otomatik kaçışıyla basılır; JS'e veri yalnızca JSON uç noktalarıyla ve `textContent` üzerinden aktarılır (`innerHTML` yok).
 6. Yüklenen spec dosyası en fazla 10 MiB (motorla aynı sınır).
 7. Aynı anda tek tarama; ikinci başlatma isteği reddedilir.

@@ -33,7 +33,10 @@ func authed(r *http.Request) bool {
 func setSecurityHeaders(h http.Header) {
 	h.Set("Content-Security-Policy", cspHeader)
 	h.Set("X-Content-Type-Options", "nosniff")
-	h.Set("Referrer-Policy", "no-referrer")
+	// same-origin, not no-referrer: under no-referrer browsers send Origin
+	// "null" and no Referer on form POSTs, which the Origin check rejects.
+	// Other origins still get no Referer.
+	h.Set("Referrer-Policy", "same-origin")
 	h.Set("Cache-Control", "no-store")
 }
 

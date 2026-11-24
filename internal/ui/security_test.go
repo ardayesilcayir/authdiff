@@ -165,7 +165,7 @@ func TestSecurityHeadersOnEveryResponse(t *testing.T) {
 		}
 		for k, v := range map[string]string{
 			"X-Content-Type-Options": "nosniff",
-			"Referrer-Policy":        "no-referrer",
+			"Referrer-Policy":        "same-origin",
 			"Cache-Control":          "no-store",
 		} {
 			if got := h.Get(k); got != v {
@@ -187,5 +187,34 @@ func TestStaticDirectoryListingIs404(t *testing.T) {
 		if w := do(s, req(s, http.MethodGet, p, nil, true)); w.Code != http.StatusNotFound {
 			t.Errorf("%s: status %d, want 404", p, w.Code)
 		}
+	}
+}
+
+// TestReferrerPolicyIsSameOrigin pins the exact Referrer-Policy. It must not
+// be "no-referrer": with that policy browsers serialize the Origin of a
+// form-submission navigation as "null" (Fetch: "serializing a request
+// origin") and send no Referer, so every HTML form POST failed the Origin
+// check with 403 in a real browser. "same-origin" still sends nothing to
+// other origins, and the session key is already stripped from the URL by
+// the login redirect.
+func TestReferrerPolicyIsSameOrigin(t *testing.T) {
+	s := testServer(t, Options{})
+	w := do(s, req(s, http.MethodGet, "/", nil, true))
+	if got := w.Header().Get("Referrer-Policy"); got != "same-origin" {
+		t.Errorf("Referrer-Policy = %q, want same-origin", got)
+	}
+	// What a browser sends for a form POST under same-origin: a same-origin
+	// Referer (and Origin). It must pass; Origin "null" must still fail.
+	r := postForm(s, "/lang", url.Values{"lang": {"en"}})
+	r.Header.Del("Origin")
+	r.Header.Set("Referer", "http://127.0.0.1:7465/")
+	if w := do(s, r); w.Code != http.StatusSeeOther {
+		t.Errorf("form POST with same-origin Referer: status %d, want 303", w.Code)
+	}
+	r = postForm(s, "/lang", url.Values{"lang": {"en"}})
+	r.Header.Set("Origin", "null")
+	r.Header.Set("Referer", "http://127.0.0.1:7465/")
+	if w := do(s, r); w.Code != http.StatusForbidden {
+		t.Errorf("Origin null: status %d, want 403", w.Code)
 	}
 }
