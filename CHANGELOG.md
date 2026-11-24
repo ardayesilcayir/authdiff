@@ -6,6 +6,10 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-24
+
+Adds `authdiff ui`, a local web interface for the whole scan flow.
+
 ### Added
 
 - `authdiff ui`: a local web interface on `127.0.0.1` (default port 7465)
@@ -124,5 +128,6 @@ First stable release.
 - README: Docker usage with `--user`, `--network host` and
   `host.docker.internal`.
 
-[Unreleased]: https://github.com/ardayesilcayir/authdiff/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/ardayesilcayir/authdiff/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/ardayesilcayir/authdiff/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/ardayesilcayir/authdiff/releases/tag/v1.0.0
