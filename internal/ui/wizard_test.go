@@ -661,7 +661,8 @@ func TestDynamicI18nKeys(t *testing.T) {
 	for _, st := range wizardSteps {
 		keys = append(keys, st.Key, "wizard.step."+st.ID)
 	}
-	keys = append(keys, "projects.title", "newproject.title", "project.title")
+	keys = append(keys, "projects.title", "newproject.title", "project.title",
+		"project.history.status.stopped", "project.history.status.failed")
 	for _, k := range keys {
 		for _, lang := range languages {
 			if _, ok := cat[lang][k]; !ok {

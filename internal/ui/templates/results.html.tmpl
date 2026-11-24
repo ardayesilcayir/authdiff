@@ -6,6 +6,14 @@
 <p class="lead">{{call .T "results.meta" $d.Started $d.Duration}}</p>
 <p class="muted">{{call .T "results.target"}} <code>{{$r.Target}}</code></p>
 </section>
+{{- if eq $d.Status.Status "stopped"}}
+<div class="notice" role="note"><p><strong>{{call .T "results.note"}}</strong> {{call .T "results.status.stopped"}}</p></div>
+{{- else if eq $d.Status.Status "failed"}}
+<div class="notice error" role="alert"><p><strong>{{call .T "results.note"}}</strong> {{call .T "results.status.failed" $d.Status.Message}}</p></div>
+{{- end}}
+{{- if $d.NoResponse}}
+<div class="notice error" role="alert"><p><strong>{{call .T "results.note"}}</strong> {{call .T "results.status.noresponse"}}</p></div>
+{{- end}}
 {{- range $r.Notes}}
 <div class="notice" role="note"><p><strong>{{call $.T "results.note"}}</strong> {{.}}</p></div>
 {{- end}}

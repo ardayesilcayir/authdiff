@@ -61,7 +61,7 @@
 <thead><tr><th scope="col">{{call .T "project.history.date"}}</th><th scope="col" class="num">{{call .T "project.history.findings"}}</th><th scope="col"><span class="visually-hidden">{{call .T "project.history.open"}}</span></th></tr></thead>
 <tbody>
 {{- range .Data.History}}
-<tr><td>{{.Started}}</td><td class="num" id="h-{{.ID}}">{{.Findings}}</td><td><a href="{{.Href}}">{{call $.T "project.history.open"}}</a></td></tr>
+<tr><td>{{.Started}}{{with .Status}} <span class="tag run-{{.}}">{{call $.T (printf "project.history.status.%s" .)}}</span>{{end}}</td><td class="num" id="h-{{.ID}}">{{.Findings}}</td><td><a href="{{.Href}}">{{call $.T "project.history.open"}}</a></td></tr>
 {{- end}}
 </tbody>
 </table>

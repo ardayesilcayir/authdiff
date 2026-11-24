@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ardayesilcayir/authdiff/internal/config"
+	"github.com/ardayesilcayir/authdiff/internal/finding"
 	"github.com/ardayesilcayir/authdiff/internal/report"
 	"github.com/ardayesilcayir/authdiff/pkg/authdiff"
 )
@@ -97,6 +99,44 @@ type RunDone struct {
 	Findings int    `json:"findings"`
 	Results  string `json:"results"`
 	Message  string `json:"message,omitempty"`
+}
+
+// statusFile records in each run directory how the run ended.
+const statusFile = "status.json"
+
+// runStatus is the content of status.json. Status is "completed",
+// "stopped" (cancelled; partial results) or "failed" (Message says why).
+// NoResponse marks a scan in which no request got an HTTP response.
+type runStatus struct {
+	Status     string `json:"status"`
+	Message    string `json:"message,omitempty"`
+	NoResponse bool   `json:"noResponse,omitempty"`
+}
+
+// noResponse reports whether a scan sent requests but got no HTTP response
+// to any of them (every one failed or was blocked).
+func noResponse(st finding.Stats) bool {
+	return st.Requests > 0 && st.Requests == st.Errors+st.Blocked
+}
+
+// writeRunStatus writes dir/status.json (0600).
+func writeRunStatus(dir string, st runStatus) error {
+	b, err := json.Marshal(st)
+	if err != nil {
+		return err
+	}
+	return writeFileAtomic(filepath.Join(dir, statusFile), b)
+}
+
+// readRunStatus reads dir/status.json; a run from before status files, or
+// an unreadable one, gives the zero value.
+func readRunStatus(dir string) runStatus {
+	var st runStatus
+	b, err := os.ReadFile(filepath.Join(dir, statusFile)) //nolint:gosec // G304: fixed file name in a validated run dir
+	if err == nil {
+		_ = json.Unmarshal(b, &st)
+	}
+	return st
 }
 
 // RunError ends a run without results.
@@ -291,11 +331,16 @@ func (m *RunManager) persist(r *run, res *authdiff.Result, scanErr error) Event 
 		Status: "done", Sent: res.Stats.Requests, Blocked: res.Stats.Blocked, Errors: res.Stats.Errors,
 		Findings: len(res.Active()), Results: "/p/" + r.project + "/runs/" + r.id + "/results",
 	}
+	st := runStatus{Status: "completed", NoResponse: noResponse(res.Stats)}
 	switch {
 	case errors.Is(scanErr, context.Canceled):
-		d.Status = "stopped"
+		d.Status, st.Status = "stopped", "stopped"
 	case scanErr != nil:
 		d.Status, d.Message = "failed", scanErr.Error()
+		st.Status, st.Message = "failed", d.Message
+	}
+	if err := writeRunStatus(r.dir, st); err != nil {
+		m.log.Error("write run status", "run", r.id, "err", err)
 	}
 	return Event{Type: "done", Data: d}
 }

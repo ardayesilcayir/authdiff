@@ -167,6 +167,8 @@ type resultsData struct {
 	Total      int // active findings
 	Findings   []finding.Finding
 	Suppressed []suppressedRow
+	Status     runStatus // how the run ended; zero for runs before status.json
+	NoResponse bool      // no request got an HTTP response
 }
 
 func (s *Server) handleResults(w http.ResponseWriter, r *http.Request) {
@@ -178,7 +180,9 @@ func (s *Server) handleResults(w http.ResponseWriter, r *http.Request) {
 		P: p, RunID: id, Base: "/p/" + p.Name + "/runs/" + id, R: res,
 		Started:  res.StartedAt.Local().Format("2006-01-02 15:04:05"),
 		Duration: res.FinishedAt.Sub(res.StartedAt).Round(100 * time.Millisecond).String(),
+		Status:   readRunStatus(filepath.Join(s.store.RunsDir(p.Name), id)),
 	}
+	d.NoResponse = d.Status.NoResponse || noResponse(res.Stats)
 	if sev, err := finding.ParseSeverity(r.URL.Query().Get("sev")); err == nil {
 		d.Sev = string(sev)
 	}
@@ -398,7 +402,8 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 type historyRow struct {
 	ID       string
 	Started  string
-	Findings int // active, with the current ignore list
+	Findings int    // active, with the current ignore list
+	Status   string // "stopped", "failed" or "" (completed or unknown)
 	Href     string
 }
 
@@ -431,10 +436,14 @@ func (s *Server) history(project string) []historyRow {
 			continue
 		}
 		base.Apply(res.Findings)
-		rows = append(rows, historyRow{
+		row := historyRow{
 			ID: id, Started: res.StartedAt.Local().Format("2006-01-02 15:04"),
 			Findings: len(res.Active()), Href: "/p/" + project + "/runs/" + id + "/results",
-		})
+		}
+		if st := readRunStatus(filepath.Join(s.store.RunsDir(project), id)).Status; st == "stopped" || st == "failed" {
+			row.Status = st
+		}
+		rows = append(rows, row)
 	}
 	return rows
 }

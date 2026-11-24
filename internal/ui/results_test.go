@@ -1,7 +1,9 @@
 package ui
 
 import (
+	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
 	"net/url"
 	"os"
@@ -547,5 +549,66 @@ func TestExportLinkShowsErrors(t *testing.T) {
 		if noDownload.MatchString(body) {
 			t.Errorf("%s: export link has a download attribute", page)
 		}
+	}
+}
+
+func writeStatus(t *testing.T, s *Server, id string, st runStatus) {
+	t.Helper()
+	b, err := json.Marshal(st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(s.store.RunsDir(resProject), id, statusFile), b, 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A stopped or failed run says so on its results page and in the history;
+// a completed run and an older run without status.json show no notice.
+func TestResultsRunStatus(t *testing.T) {
+	s := resultsServer(t)
+	en := s.cat["en"]
+	stopped, failed := template.HTMLEscapeString(en["results.status.stopped"]), template.HTMLEscapeString(fmt.Sprintf(en["results.status.failed"], "rate limited"))
+	_, body := get(t, s, resultsURL)
+	if strings.Contains(body, stopped) || strings.Contains(body, `class="tag run-`) {
+		t.Error("run without status.json shows a status")
+	}
+
+	writeStatus(t, s, resRun, runStatus{Status: "stopped"})
+	if _, body = get(t, s, resultsURL); !strings.Contains(body, stopped) {
+		t.Error("stopped run: notice missing")
+	}
+	if _, body = get(t, s, "/p/"+resProject); !strings.Contains(body, template.HTMLEscapeString(en["project.history.status.stopped"])) {
+		t.Error("stopped run: history label missing")
+	}
+
+	writeStatus(t, s, resRun, runStatus{Status: "failed", Message: "rate limited"})
+	if _, body = get(t, s, resultsURL); !strings.Contains(body, failed) {
+		t.Error("failed run: notice with message missing")
+	}
+	if _, body = get(t, s, "/p/"+resProject); !strings.Contains(body, template.HTMLEscapeString(en["project.history.status.failed"])) {
+		t.Error("failed run: history label missing")
+	}
+
+	writeStatus(t, s, resRun, runStatus{Status: "completed"})
+	if _, body = get(t, s, resultsURL); strings.Contains(body, stopped) || strings.Contains(body, template.HTMLEscapeString(en["results.status.noresponse"])) {
+		t.Error("completed run shows a status notice")
+	}
+}
+
+// A scan in which no request got an HTTP response is not shown as clean.
+func TestResultsNoResponseWarning(t *testing.T) {
+	s := resultsServer(t)
+	warn := template.HTMLEscapeString(s.cat["en"]["results.status.noresponse"])
+	if _, body := get(t, s, resultsURL); strings.Contains(body, warn) {
+		t.Error("warning shown for a scan with responses")
+	}
+	res := resultFixture()
+	res.Findings, res.Matrix = nil, nil
+	res.Stats = finding.Stats{Endpoints: 2, Requests: 4, Errors: 3, Blocked: 1}
+	writeRun(t, s, resProject, "20261124-110000", res)
+	_, body := get(t, s, "/p/"+resProject+"/runs/20261124-110000/results")
+	if !strings.Contains(body, warn) || !strings.Contains(body, `role="alert"`) {
+		t.Error("no-response warning missing")
 	}
 }

@@ -132,6 +132,7 @@ td.path,th.path{font-family:ui-monospace,"Cascadia Mono",Menlo,Consolas,monospac
 .tag{display:inline-block;font-size:.75rem;font-weight:700;padding:1px 7px;border-radius:3px;border:1px solid currentColor;white-space:nowrap}
 .tag.critical{color:var(--crit)}.tag.high{color:var(--high)}.tag.medium{color:var(--med)}.tag.low{color:var(--low)}.tag.info{color:var(--info)}
 .tag.destructive{color:var(--bad-fg);background:var(--bad-bg)}
+.tag.run-stopped{color:var(--warn-fg)}.tag.run-failed{color:var(--bad-fg)}
 
 /* Wizard pages */
 .stepnav{align-self:start}

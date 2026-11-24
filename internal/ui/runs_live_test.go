@@ -467,3 +467,51 @@ func TestRunWriteFailureLeavesNoResults(t *testing.T) {
 		t.Errorf("status %d, want 200 with the write error", w.Code)
 	}
 }
+
+// Each run with results records how it ended in status.json (0600), so a
+// stopped or failed run is not shown as complete after a restart.
+func TestRunStatusFile(t *testing.T) {
+	s := runServer(t, Options{})
+	api := newRunAPI(t, false, 0)
+	p := runFixture(t, s, api, false, true)
+	cfg, err := BuildConfig(p, s.secrets, s.store.Dir(p.Name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name  string
+		stats finding.Stats
+		err   error
+		want  runStatus
+	}{
+		{"completed", finding.Stats{Requests: 5, Errors: 1}, nil, runStatus{Status: "completed"}},
+		{"stopped", finding.Stats{Requests: 5}, context.Canceled, runStatus{Status: "stopped"}},
+		{"failed", finding.Stats{Requests: 5}, errors.New("rate limited"), runStatus{Status: "failed", Message: "rate limited"}},
+		{"no response", finding.Stats{Requests: 4, Errors: 3, Blocked: 1}, nil, runStatus{Status: "completed", NoResponse: true}},
+	}
+	for _, c := range cases {
+		s.runs.scan = func(context.Context, authdiff.ScanOptions) (*authdiff.Result, error) {
+			return &authdiff.Result{Stats: c.stats}, c.err
+		}
+		id, err := s.runs.Start(p, cfg, s.store.Dir(p.Name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		waitRun(t, s, id)
+		path := filepath.Join(s.store.RunsDir(p.Name), id, statusFile)
+		b, err := os.ReadFile(path) //nolint:gosec // G304: test temp dir
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		var got runStatus
+		if err := json.Unmarshal(b, &got); err != nil {
+			t.Fatal(err)
+		}
+		if got != c.want {
+			t.Errorf("%s: status.json %+v, want %+v", c.name, got, c.want)
+		}
+		if fi, err := os.Stat(path); err == nil && !isWindows() && fi.Mode().Perm() != 0o600 {
+			t.Errorf("%s: mode %v", c.name, fi.Mode().Perm())
+		}
+	}
+}
