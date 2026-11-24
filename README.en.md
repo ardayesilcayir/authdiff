@@ -118,6 +118,7 @@ Without Docker: `cd vuln-lab && python -m venv .venv && .venv/bin/pip install -r
 | `authdiff scan --dry-run` | Prints the request plan as a table, sends nothing to the target |
 | `authdiff rules list` / `rules validate <file>` | Lists rules / validates a custom rule |
 | `authdiff report -i results.json -f html` | Renders a saved result in another format |
+| `authdiff ui` | Opens the local web interface ([Using the UI](#using-the-ui)) |
 | `authdiff version` | Version, commit and build date |
 
 Common `scan` flags: `--rate 5`, `--concurrency 4`, `--allow-destructive`,
@@ -149,6 +150,36 @@ profiles:
 ```
 
 Every option is described in [docs/configuration.md](docs/configuration.md).
+
+## Using the UI
+
+`authdiff ui` runs the whole flow in the browser, without YAML, environment
+variables or the terminal. It listens on `127.0.0.1` only.
+
+```sh
+authdiff ui                   # http://127.0.0.1:7465, opens the browser
+authdiff ui --port 8080 --no-open --projects-dir ./projects
+```
+
+Open the link the terminal prints: it carries this session's key, and the
+interface does not work without it. Then:
+
+1. **Scan the demo lab** (needs `make lab`) creates a ready project and goes
+   straight to the plan, or **Set up a new project** walks through
+   **Target → Endpoints → Profiles → Settings**.
+2. **Plan** shows every request before anything is sent (dry run).
+3. **Scan** shows live progress and preliminary findings; *Stop the scan*
+   keeps partial results.
+4. **Results**: heat map, findings with masked evidence, *Mark as false
+   positive* (writes `.authdiff-ignore`), downloads of `results.json`,
+   `results.sarif` and `report.html`.
+5. **Download project zip** gives `authdiff.yaml`, the spec and
+   `.env.example` for `authdiff scan` in CI.
+
+Tokens stay in the server's memory and are never written to disk: after a
+restart, enter them again or set `AUTHDIFF_<PROFILE>_TOKEN` before starting.
+Destructive mode turns on only after typing `I understand` (or `anladım`).
+Security model, project directory and limits: [docs/ui.md](docs/ui.md).
 
 ## CI usage
 
@@ -233,6 +264,7 @@ For bug bounty programs, read the program's scope and rules first, use a low
 - [Configuration reference](docs/configuration.md)
 - [Writing rules](docs/writing-rules.md)
 - [Rule reference](docs/rules/): what each rule finds, how it works, how to fix it
+- [Web interface](docs/ui.md): security model, projects, demo, export
 - [Architecture](docs/architecture.md) and decisions: [ADR-0001 Go](docs/adr/0001-go-secimi.md), [ADR-0002 comparison algorithm](docs/adr/0002-karsilastirma-algoritmasi.md)
 - [Benchmarks / Karşılaştırma](docs/benchmarks.md): how authdiff compares with other tools
 - [vuln-lab](vuln-lab/README.md) and its [expected findings](vuln-lab/VULNERABILITIES.md)
@@ -243,16 +275,19 @@ For bug bounty programs, read the program's scope and rules first, use a low
 go test ./...                 # unit, engine and golden tests
 make cover                    # internal/ coverage (CI requires >= 80%)
 make lint                     # golangci-lint
-make e2e                      # recreates the vuln-lab, then the end-to-end test
+make e2e                      # both end-to-end tests, each against a recreated vuln-lab
+make ui                       # starts the web interface from the checkout
 ```
 
-The end-to-end test runs a destructive scan against a fresh vuln-lab and
-requires the found `(rule, method, path)` set to equal the oracle in
+The end-to-end tests run a destructive scan against a fresh vuln-lab, once
+through the CLI API (`TestVulnLab`) and once through the web interface
+(`TestUIDemoMatchesOracle`: demo project, destructive mode, scan, results), and
+require the found `(rule, method, path)` set to equal the oracle in
 [VULNERABILITIES.md](vuln-lab/VULNERABILITIES.md), with no finding on the
 negative controls. It logs recall and false positive rate (currently 1.00 and
-0.00). The lab keeps its data in memory and reseeds on start; `make e2e`
-recreates the container first, because a previous destructive scan changes
-the data.
+0.00). The lab keeps its data in memory and reseeds on start; because a
+destructive scan changes the data, `make e2e` recreates the container before
+each test, and the two tests are never run in one `go test` invocation.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Security issues in authdiff itself:
 [SECURITY.md](SECURITY.md).

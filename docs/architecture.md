@@ -32,7 +32,8 @@ res, err := authdiff.Scan(ctx, authdiff.ScanOptions{ConfigPath: "authdiff.yaml"}
 | Package | Responsibility |
 |---|---|
 | `pkg/authdiff` | Public API: `Scan`, `PlanContext`, `LoadConfig`, `LoadInventory`, `LoadRules`. Resolves relative paths against the config file and redacts URL secrets in errors. |
-| `internal/cli` | Commands `init`, `inventory`, `scan`, `rules`, `report`, `version`; flags, logging (`slog`, text or JSON), exit codes. The only package that imports cobra. |
+| `internal/cli` | Commands `init`, `inventory`, `scan`, `rules`, `report`, `ui`, `version`; flags, logging (`slog`, text or JSON), exit codes. The only package that imports cobra. |
+| `internal/ui` | `authdiff ui`: the local web interface on `127.0.0.1` (`net/http`, `html/template`, embedded static files, Server-Sent Events). Projects, in-memory credentials, scan runs, results. See [The web interface](#the-web-interface). |
 | `internal/config` | `authdiff.yaml` model, `${env:NAME}` expansion, defaults, validation that reports every problem at once. |
 | `internal/spec` | OpenAPI 3.0/3.1 loading (kin-openapi), endpoint inventory with parameters, request body examples, `security`, tags and source line; glob filters. |
 | `internal/identity` | Profiles, credential injection (bearer, cookie, API key, basic, none), the pool of owned IDs per profile (config plus harvest). |
@@ -44,6 +45,41 @@ res, err := authdiff.Scan(ctx, authdiff.ScanOptions{ConfigPath: "authdiff.yaml"}
 | `internal/finding` | Finding, Result, severity, stable IDs, `.authdiff-ignore` baseline. |
 | `internal/report` | Terminal, JSON, SARIF 2.1.0 and HTML writers. Imports only `finding`. |
 | `rules/` | Built-in rule templates, embedded into the binary. |
+
+## The web interface
+
+`internal/ui` is a second front end next to the CLI, not a second engine.
+`internal/cli` only parses the `ui` flags and calls `ui.New`, `Listen` and
+`Serve`. Everything the interface scans goes through the same entry point as
+the CLI:
+
+```
+browser ──► internal/ui ──► project.json ──► *config.Config (in memory,
+ (forms,     (security       (wizard state)    credentials from memory)
+  SSE)        checks,                                │
+              handlers)                              ▼
+                 ▲            pkg/authdiff.Scan / PlanContext / LoadInventory
+                 │                                   │
+                 └──── authdiff.Progress hook ◄──── engine ──► transport ──► target API
+                         (live counters, preliminary findings)
+```
+
+Dependency rule: `internal/ui` imports only `pkg/authdiff`, `internal/config`
+(model, validation, YAML `Marshal` for the export), `internal/finding`,
+`internal/report` (reading `results.json`, the heat map),
+`internal/spec` (inventory types), `internal/engine` (the `PlannedRequest`
+and `Progress` types only) and the embedded `examples` (demo). It does not
+import cobra, and only `internal/cli` (and the e2e test) imports it. It
+never builds requests to the target itself; its one outbound request is the
+demo lab's health check (`GET <lab>/openapi.json`, loopback only, no proxy, no
+redirects).
+
+The project's source of truth is `project.json`. For a scan the interface
+builds a `*config.Config` in memory, puts the in-memory credentials into it
+and calls `Scan` with `ScanOptions.Config`; `authdiff.yaml` in the project
+directory is generated output with `${env:...}` placeholders for the export.
+The interface runs only the built-in rules. Security model and limits:
+[ui.md](ui.md).
 
 ## The transport: safety in one place
 

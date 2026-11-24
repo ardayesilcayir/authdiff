@@ -8,6 +8,19 @@ follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `authdiff ui`: a local web interface on `127.0.0.1` (default port 7465)
+  that runs the whole flow in the browser: demo project for the bundled
+  vuln-lab, a setup wizard (target, endpoints, profiles, settings), dry-run
+  plan, live scan progress over Server-Sent Events with stop, results with
+  heat map, finding detail and false-positive triage into `.authdiff-ignore`,
+  downloads of the reports, run history and a project zip for the CLI.
+  English and Turkish. Session key, Host and Origin checks, CSRF tokens and a
+  strict CSP; credentials stay in memory and are never written to disk
+  (except the demo's fake lab tokens). See `docs/ui.md`.
+- `pkg/authdiff`: `ScanOptions.Config` / `BaseDir` to scan an in-memory
+  config, and `ScanOptions.OnProgress` for progress events.
+- `make ui` and `make e2e-ui`; the end-to-end suite also drives the web
+  interface against the vuln-lab and checks the same oracle as the CLI test.
 - `matrixAllows("step")` rule expression helper: true when a matrix entry
   for the endpoint explicitly allows the step's profile.
 - Second-target validation against VAmPI: `docs/benchmarks.md`,

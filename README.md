@@ -121,6 +121,7 @@ Docker olmadan: `cd vuln-lab && python -m venv .venv && .venv/bin/pip install -r
 | `authdiff scan --dry-run` | İstek planını tablo olarak basar, hedefe hiçbir şey göndermez |
 | `authdiff rules list` / `rules validate <dosya>` | Kuralları listeler / özel kuralı doğrular |
 | `authdiff report -i results.json -f html` | Kayıtlı sonucu başka formatta üretir |
+| `authdiff ui` | Yerel web arayüzünü açar ([Arayüz ile kullanım](#arayüz-ile-kullanım)) |
 | `authdiff version` | Sürüm, commit ve build tarihi |
 
 Sık kullanılan `scan` bayrakları: `--rate 5`, `--concurrency 4`,
@@ -152,6 +153,37 @@ profiles:
 
 Tüm seçenekler [docs/configuration.md](docs/configuration.md) dosyasında
 (İngilizce) anlatılır.
+
+## Arayüz ile kullanım
+
+`authdiff ui` tüm akışı tarayıcıda çalıştırır; YAML, ortam değişkeni ya da
+terminal gerekmez. Yalnızca `127.0.0.1` üzerinde dinler.
+
+```sh
+authdiff ui                   # http://127.0.0.1:7465, tarayıcıyı açar
+authdiff ui --port 8080 --no-open --projects-dir ./projects
+```
+
+Terminalde basılan bağlantıyı açın: bu oturumun anahtarını taşır ve arayüz
+onsuz çalışmaz. Ardından:
+
+1. **Demo lab'ı tara** (`make lab` gerekir) hazır bir proje oluşturup doğrudan
+   plana gider; **Yeni proje kur** ise **Hedef → Endpoint'ler → Profiller →
+   Ayarlar** adımlarından geçirir.
+2. **Plan**, hiçbir şey gönderilmeden önce tüm istekleri gösterir (dry run).
+3. **Tarama** canlı ilerlemeyi ve ön bulguları gösterir; *Taramayı durdur*
+   kısmi sonuçları korur.
+4. **Sonuçlar**: ısı haritası, maskeli kanıtlı bulgular, *Yanlış pozitif
+   olarak işaretle* (`.authdiff-ignore`'a yazar), `results.json`,
+   `results.sarif` ve `report.html` indirme.
+5. **Proje zip'ini indir**, CI'da `authdiff scan` için `authdiff.yaml`, spec
+   ve `.env.example` verir.
+
+Token'lar sunucu belleğinde kalır, diske asla yazılmaz: sunucu yeniden
+başlarsa yeniden girin ya da başlatmadan önce `AUTHDIFF_<PROFİL>_TOKEN`
+ortam değişkenini ayarlayın. Yıkıcı mod yalnızca `anladım` (ya da
+`I understand`) yazılınca açılır. Güvenlik modeli, proje dizini ve sınırlar:
+[docs/ui.md](docs/ui.md) (İngilizce).
 
 ## CI kullanımı
 
@@ -240,6 +272,7 @@ Dokümantasyon İngilizcedir:
 - [Yapılandırma başvurusu](docs/configuration.md)
 - [Kural yazma](docs/writing-rules.md)
 - [Kural başvurusu](docs/rules/): her kural ne bulur, nasıl çalışır, nasıl düzeltilir
+- [Web arayüzü](docs/ui.md): güvenlik modeli, projeler, demo, dışa aktarma
 - [Mimari](docs/architecture.md) ve kararlar: [ADR-0001 Go](docs/adr/0001-go-secimi.md), [ADR-0002 karşılaştırma algoritması](docs/adr/0002-karsilastirma-algoritmasi.md)
 - [Karşılaştırma / Benchmarks](docs/benchmarks.md): authdiff'in diğer araçlarla karşılaştırması
 - [vuln-lab](vuln-lab/README.md) ve [beklenen bulguları](vuln-lab/VULNERABILITIES.md)
@@ -250,16 +283,20 @@ Dokümantasyon İngilizcedir:
 go test ./...                 # birim, motor ve golden testleri
 make cover                    # internal/ kapsamı (CI ≥ %80 ister)
 make lint                     # golangci-lint
-make e2e                      # vuln-lab'ı yeniden oluşturur, ardından uçtan uca test
+make e2e                      # iki uçtan uca test, her biri yeniden oluşturulan vuln-lab'a karşı
+make ui                       # web arayüzünü depodan başlatır
 ```
 
-Uçtan uca test, temiz bir vuln-lab'a karşı yıkıcı bir tarama çalıştırır ve
-bulunan `(rule, method, path)` kümesinin
+Uçtan uca testler temiz bir vuln-lab'a karşı yıkıcı bir tarama çalıştırır:
+bir kez CLI API'si üzerinden (`TestVulnLab`), bir kez web arayüzü üzerinden
+(`TestUIDemoMatchesOracle`: demo projesi, yıkıcı mod, tarama, sonuçlar). İkisi
+de bulunan `(rule, method, path)` kümesinin
 [VULNERABILITIES.md](vuln-lab/VULNERABILITIES.md) içindeki listeye eşit
-olmasını, negatif kontrollerde hiç bulgu çıkmamasını ister. Recall ve yanlış
-pozitif oranını basar (şu an 1.00 ve 0.00). Lab verisini bellekte tutar ve
-her başlatmada sıfırlanır; önceki yıkıcı tarama veriyi değiştirdiği için
-`make e2e` önce container'ı yeniden oluşturur.
+olmasını, negatif kontrollerde hiç bulgu çıkmamasını ister ve recall ile
+yanlış pozitif oranını basar (şu an 1.00 ve 0.00). Lab verisini bellekte tutar
+ve her başlatmada sıfırlanır; yıkıcı tarama veriyi değiştirdiği için
+`make e2e` her testten önce container'ı yeniden oluşturur ve iki test asla
+aynı `go test` çağrısında çalıştırılmaz.
 
 Bkz. [CONTRIBUTING.md](CONTRIBUTING.md). authdiff'in kendisindeki güvenlik
 açıkları için: [SECURITY.md](SECURITY.md).
