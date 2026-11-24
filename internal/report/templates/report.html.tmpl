@@ -85,21 +85,7 @@ summary{cursor:pointer;color:var(--muted)}
 <section>
 <h2>Authorization matrix</h2>
 {{if .Rows}}
-<ul class="legend" aria-label="Legend">
-{{- range .Legend}}
-<li class="cell {{.Class}}"><i aria-hidden="true">{{.Glyph}}</i> {{.Label}}</li>
-{{- end}}
-</ul>
-<div class="scroll" tabindex="0" role="region" aria-label="Endpoint by profile matrix">
-<table>
-<thead><tr><th scope="col">Endpoint</th>{{range .Profiles}}<th scope="col">{{.}}</th>{{end}}</tr></thead>
-<tbody>
-{{- range .Rows}}
-<tr><th scope="row">{{.Endpoint}}</th>{{range .Cells}}<td class="hm"><div class="cell {{.Class}}"><i aria-hidden="true">{{.Glyph}}</i> {{.Label}}</div></td>{{end}}</tr>
-{{- end}}
-</tbody>
-</table>
-</div>
+{{template "heatmap" .}}
 {{else}}
 <p class="empty">No matrix data was recorded for this scan.</p>
 {{end}}

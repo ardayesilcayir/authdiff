@@ -211,6 +211,8 @@ type overviewData struct {
 	Missing []string
 	Steps   []stepItem
 	Errors  formErrors
+	History []historyRow
+	Running string // live page of this project's running scan, if any
 }
 
 func (s *Server) overview(r *http.Request, p *Project, errs formErrors) *pageData {
@@ -224,10 +226,14 @@ func (s *Server) overview(r *http.Request, p *Project, errs formErrors) *pageDat
 	if errs == nil {
 		errs = formErrors{}
 	}
-	pd.Data = overviewData{
+	d := overviewData{
 		P: p, Spec: specLabel(p), Next: next, Missing: s.secrets.Missing(p),
-		Steps: stepsFor(p, ""), Errors: errs,
+		Steps: stepsFor(p, ""), Errors: errs, History: s.history(p.Name),
 	}
+	if id, project := s.runs.active(); id != "" && project == p.Name {
+		d.Running = "/p/" + p.Name + "/runs/" + id
+	}
+	pd.Data = d
 	return pd
 }
 

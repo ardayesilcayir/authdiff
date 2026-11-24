@@ -1,0 +1,79 @@
+{{define "content"}}
+{{- $d := .Data}}{{$p := $d.P}}{{$f := $d.F}}
+<section class="intro finding-head sev-{{$f.Severity}}">
+<p class="crumb"><a href="/p/{{$p.Name}}">{{$p.Name}}</a> / <a href="{{$d.Base}}/results#findings">{{call .T "finding.back"}}</a></p>
+<h1><span class="tag {{$f.Severity}}">{{call .T (printf "sev.%s" $f.Severity)}}</span> {{$f.Title}}</h1>
+<p class="lead"><span class="method m-{{$f.Method}}">{{$f.Method}}</span> <code>{{$f.Path}}</code></p>
+</section>
+{{- if $f.Suppressed}}
+<div class="notice" role="status"><p><strong>{{call .T "finding.suppressed"}}</strong>{{with $d.Reason}} {{call $.T "finding.suppressed.reason" .}}{{end}}</p></div>
+{{- end}}
+
+<div class="finding-grid">
+<section aria-labelledby="about-h">
+<h2 id="about-h" class="visually-hidden">{{call .T "finding.title"}}</h2>
+{{- with $f.Description}}<p>{{.}}</p>{{end}}
+<dl class="facts">
+<dt>{{call .T "finding.rule"}}</dt><dd>{{if $d.DocURL}}<a href="{{$d.DocURL}}" target="_blank" rel="noopener noreferrer"><code>{{$f.RuleID}}</code></a>{{else}}<code>{{$f.RuleID}}</code>{{end}}{{with $f.OWASP}} · {{.}}{{end}}{{with $f.CWE}} · {{.}}{{end}}</dd>
+{{- if $f.Attacker}}
+<dt>{{call .T "results.col.who"}}</dt><dd>{{$f.Attacker}} → {{or $f.Victim "–"}}</dd>
+{{- end}}
+<dt>{{call .T "finding.confidence"}}</dt><dd>{{$f.Confidence}}</dd>
+<dt>{{call .T "finding.similarity"}}</dt><dd>{{$d.Percent}}</dd>
+<dt>{{call .T "finding.id"}}</dt><dd><code>{{$f.ID}}</code></dd>
+</dl>
+{{- if or $f.Remediation $d.DocURL}}
+<h2>{{call .T "finding.fix"}}</h2>
+{{- with $f.Remediation}}<p>{{.}}</p>{{end}}
+{{- with $d.DocURL}}<p><a href="{{.}}" target="_blank" rel="noopener noreferrer">{{call $.T "finding.guide"}}</a></p>{{end}}
+{{- end}}
+</section>
+
+{{- if not $f.Suppressed}}
+<section class="triage" aria-labelledby="tri-h">
+<h2 id="tri-h">{{call .T "finding.triage.title"}}</h2>
+<p class="hint">{{call .T "finding.triage.body"}}</p>
+<form method="post" action="{{$d.Base}}/findings/{{$f.ID}}/ignore">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<div class="field">
+<label for="reason">{{call .T "finding.reason"}}</label>
+<textarea id="reason" name="reason" required maxlength="500" aria-describedby="reason-help{{if index $d.Errors "reason"}} reason-err{{end}}"{{if index $d.Errors "reason"}} aria-invalid="true"{{end}}>{{$d.Input}}</textarea>
+<p class="help" id="reason-help">{{call .T "finding.reason.help"}}</p>
+{{- with index $d.Errors "reason"}}<p class="err" id="reason-err">{{call $.T .}}</p>{{end}}
+</div>
+<button class="btn" type="submit">{{call .T "finding.triage.action"}}</button>
+</form>
+</section>
+{{- end}}
+</div>
+
+<section class="evidence" aria-labelledby="ev-h">
+<h2 id="ev-h">{{call .T "finding.evidence" (len $d.Ex)}}</h2>
+{{- if $d.Ex}}
+<p class="hint">{{call .T "finding.evidence.hint"}}</p>
+{{- range $d.Ex}}
+<article class="exchange">
+<h3>{{call $.T "finding.ex.as" .Step .Profile}} <span class="status">{{.Status}}</span></h3>
+<p class="ex-url"><span class="method m-{{.Method}}">{{.Method}}</span> <code>{{.URL}}</code></p>
+{{- if .Truncated}}<p class="hint">{{call $.T "finding.truncated"}}</p>{{end}}
+<div class="ex-grid">
+<div>
+<h4>{{call $.T "finding.request"}}</h4>
+{{- if .ReqHeaders}}<pre class="headers">{{range .ReqHeaders}}{{.Name}}: {{.Value}}
+{{end}}</pre>{{end}}
+{{- if .ReqBody}}<pre>{{.ReqBody}}</pre>{{if .ReqCut}}<p class="hint">{{call $.T "finding.cut" $d.CapKiB}}</p>{{end}}{{else if not .ReqHeaders}}<p class="muted">{{call $.T "finding.nobody"}}</p>{{end}}
+</div>
+<div>
+<h4>{{call $.T "finding.response"}}</h4>
+{{- if .RespHeaders}}<pre class="headers">{{range .RespHeaders}}{{.Name}}: {{.Value}}
+{{end}}</pre>{{end}}
+{{- if .RespBody}}<pre>{{.RespBody}}</pre>{{if .RespCut}}<p class="hint">{{call $.T "finding.cut" $d.CapKiB}}</p>{{end}}{{else}}<p class="muted">{{call $.T "finding.nobody"}}</p>{{end}}
+</div>
+</div>
+</article>
+{{- end}}
+{{- else}}
+<p class="empty">{{call .T "finding.evidence.none"}}</p>
+{{- end}}
+</section>
+{{end}}

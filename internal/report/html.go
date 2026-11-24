@@ -14,13 +14,23 @@ import (
 //go:embed templates/report.html.tmpl
 var htmlTmplSrc string
 
-var htmlTmpl = template.Must(template.New("report").Funcs(template.FuncMap{
-	"upper": strings.ToUpper,
-	"pct":   func(f float64) string { return fmt.Sprintf("%.0f%%", f*100) },
-	"helpURL": func(id string) string {
-		return ruleHelpBase + id + ".md"
-	},
-}).Parse(htmlTmplSrc))
+// heatmapTmplSrc defines the "heatmap" template shared with the UI.
+//
+//go:embed templates/heatmap.html.tmpl
+var heatmapTmplSrc string
+
+// htmlTmpl is the report template with the shared "heatmap" template.
+var htmlTmpl = func() *template.Template {
+	t := template.Must(template.New("report").Funcs(template.FuncMap{
+		"upper": strings.ToUpper,
+		"pct":   func(f float64) string { return fmt.Sprintf("%.0f%%", f*100) },
+		"helpURL": func(id string) string {
+			return ruleHelpBase + id + ".md"
+		},
+	}).Parse(htmlTmplSrc))
+	template.Must(t.New("heatmap.html.tmpl").Parse(heatmapTmplSrc))
+	return t
+}()
 
 type hmCell struct {
 	Class  string
@@ -116,9 +126,33 @@ func WriteHTML(w io.Writer, r *finding.Result) error {
 		v.Counts = append(v.Counts, sevCount{s, n})
 	}
 	v.Duration = r.FinishedAt.Sub(r.StartedAt).Round(time.Millisecond).String()
-	v.Profiles, v.Rows = buildHeatmap(r)
-	for _, o := range []finding.Outcome{finding.Allowed, finding.Denied, finding.Unexpected, finding.Skipped, finding.Errored} {
-		v.Legend = append(v.Legend, hmCell{Class: string(o), Glyph: glyphs[o], Label: string(o)})
-	}
+	v.Profiles, v.Rows, v.Legend = heatmapData(r)
 	return htmlTmpl.Execute(w, v)
+}
+
+// heatmapData is what the "heatmap" template needs.
+func heatmapData(r *finding.Result) ([]string, []hmRow, []hmCell) {
+	profiles, rows := buildHeatmap(r)
+	var legend []hmCell
+	for _, o := range []finding.Outcome{finding.Allowed, finding.Denied, finding.Unexpected, finding.Skipped, finding.Errored} {
+		legend = append(legend, hmCell{Class: string(o), Glyph: glyphs[o], Label: string(o)})
+	}
+	return profiles, rows, legend
+}
+
+// Heatmap renders the endpoint x profile matrix of r with the same markup
+// (the shared "heatmap" template) as the HTML report: a legend list and a
+// scrollable table using the classes legend, scroll, hm and cell <outcome>.
+// It is empty when r has no matrix data.
+func Heatmap(r *finding.Result) (template.HTML, error) {
+	var v htmlView
+	v.Profiles, v.Rows, v.Legend = heatmapData(r)
+	if len(v.Rows) == 0 {
+		return "", nil
+	}
+	var buf strings.Builder
+	if err := htmlTmpl.ExecuteTemplate(&buf, "heatmap", v); err != nil {
+		return "", err
+	}
+	return template.HTML(buf.String()), nil //nolint:gosec // G203: html/template output, already escaped
 }

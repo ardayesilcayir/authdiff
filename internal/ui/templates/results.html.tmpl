@@ -1,0 +1,112 @@
+{{define "content"}}
+{{- $d := .Data}}{{$p := $d.P}}{{$r := $d.R}}
+<section class="intro">
+<p class="crumb"><a href="/p/{{$p.Name}}">{{$p.Name}}</a></p>
+<h1>{{call .T "results.title"}}</h1>
+<p class="lead">{{call .T "results.meta" $d.Started $d.Duration}}</p>
+<p class="muted">{{call .T "results.target"}} <code>{{$r.Target}}</code></p>
+</section>
+{{- range $r.Notes}}
+<div class="notice" role="note"><p><strong>{{call $.T "results.note"}}</strong> {{.}}</p></div>
+{{- end}}
+
+<section class="summary" aria-labelledby="sum-h">
+<h2 id="sum-h" class="visually-hidden">{{call .T "results.summary"}}</h2>
+<div class="tally">
+{{- range $d.Tallies}}
+<a class="tally-item sev-{{.Severity}}{{if not .Count}} zero{{end}}" href="{{.Href}}#findings"{{if .Current}} aria-current="true"{{end}}><b id="n-{{.Severity}}">{{.Count}}</b><span>{{call $.T (printf "sev.%s" .Severity)}}</span></a>
+{{- end}}
+<div class="tally-item stat"><b id="n-requests">{{$r.Stats.Requests}}</b><span>{{call .T "results.requests"}}</span></div>
+<div class="tally-item stat"><b id="n-blocked">{{$r.Stats.Blocked}}</b><span>{{call .T "results.blocked"}}</span></div>
+<div class="tally-item stat"><b id="n-errors">{{$r.Stats.Errors}}</b><span>{{call .T "results.errors"}}</span></div>
+<div class="tally-item stat"><b id="n-duration">{{$d.Duration}}</b><span>{{call .T "results.duration"}}</span></div>
+</div>
+</section>
+
+<section class="exports" aria-labelledby="dl-h">
+<h2 id="dl-h">{{call .T "results.export.title"}}</h2>
+<p class="hint">{{call .T "results.export.hint"}}</p>
+<div class="actions">
+<a class="btn small" href="{{$d.Base}}/download/results.json" download>results.json</a>
+<a class="btn small" href="{{$d.Base}}/download/results.sarif" download>results.sarif</a>
+<a class="btn small" href="{{$d.Base}}/download/report.html" download>report.html</a>
+<a class="btn small" href="/p/{{$p.Name}}/export.zip" download>{{call .T "results.export.zip"}}</a>
+</div>
+</section>
+
+<section class="matrix-block" aria-labelledby="hm-h">
+<h2 id="hm-h">{{call .T "results.matrix"}}</h2>
+{{- if $d.Heatmap}}
+<p class="hint">{{call .T "results.matrix.hint"}}</p>
+<div class="heatmap">{{$d.Heatmap}}</div>
+{{- else}}
+<p class="empty">{{call .T "results.matrix.empty"}}</p>
+{{- end}}
+</section>
+
+<section id="findings" aria-labelledby="f-h">
+<h2 id="f-h">{{call .T "results.findings"}}</h2>
+{{- if $d.Total}}
+<form class="filters" method="get" action="{{$d.Base}}/results">
+<div class="field">
+<label for="f-sev">{{call .T "results.filter.sev"}}</label>
+<select id="f-sev" name="sev">
+<option value="">{{call .T "results.filter.all"}}</option>
+{{- range $d.Tallies}}
+<option value="{{.Severity}}"{{if eq (printf "%s" .Severity) $d.Sev}} selected{{end}}>{{call $.T (printf "sev.%s" .Severity)}} ({{.Count}})</option>
+{{- end}}
+</select>
+</div>
+<div class="field">
+<label for="f-rule">{{call .T "results.filter.rule"}}</label>
+<select id="f-rule" name="rule">
+<option value="">{{call .T "results.filter.all"}}</option>
+{{- range $d.Rules}}
+<option value="{{.}}"{{if eq . $d.Rule}} selected{{end}}>{{.}}</option>
+{{- end}}
+</select>
+</div>
+<button class="btn" type="submit">{{call .T "results.filter.apply"}}</button>
+{{- if $d.Filtered}}
+<a href="{{$d.Base}}/results#findings">{{call .T "results.filter.clear"}}</a>
+{{- end}}
+</form>
+<p class="hint" role="status">{{call .T "results.filter.count" (len $d.Findings) $d.Total}}</p>
+{{- end}}
+{{- if $d.Findings}}
+<div class="scroll">
+<table class="findings">
+<thead><tr><th scope="col">{{call .T "results.col.severity"}}</th><th scope="col">{{call .T "results.col.finding"}}</th><th scope="col">{{call .T "results.col.endpoint"}}</th><th scope="col">{{call .T "results.col.who"}}</th><th scope="col">{{call .T "results.col.rule"}}</th></tr></thead>
+<tbody>
+{{- range $d.Findings}}
+<tr class="sev-row-{{.Severity}}"><td><span class="tag {{.Severity}}">{{call $.T (printf "sev.%s" .Severity)}}</span></td><td class="title"><a href="{{$d.Base}}/findings/{{.ID}}">{{.Title}}</a></td><td class="path"><span class="method m-{{.Method}}">{{.Method}}</span> {{.Path}}</td><td class="small">{{if .Attacker}}{{.Attacker}} → {{or .Victim "–"}}{{else}}–{{end}}</td><td><code>{{.RuleID}}</code></td></tr>
+{{- end}}
+</tbody>
+</table>
+</div>
+{{- else if $d.Total}}
+<p class="empty">{{call .T "results.none_match"}}</p>
+{{- else}}
+<p class="empty">{{call .T "results.none"}}</p>
+{{- end}}
+</section>
+
+<section id="suppressed" class="suppressed" aria-labelledby="s-h">
+<h2 id="s-h">{{call .T "results.suppressed" (len $d.Suppressed)}}</h2>
+<p class="hint">{{call .T "results.suppressed.hint"}}</p>
+{{- if $d.Suppressed}}
+<div class="scroll">
+<table>
+<thead><tr><th scope="col">{{call .T "results.col.severity"}}</th><th scope="col">{{call .T "results.col.finding"}}</th><th scope="col">{{call .T "results.col.endpoint"}}</th><th scope="col">{{call .T "results.col.reason"}}</th></tr></thead>
+<tbody>
+{{- range $d.Suppressed}}
+<tr><td><span class="tag {{.F.Severity}}">{{call $.T (printf "sev.%s" .F.Severity)}}</span></td><td class="title"><a href="{{$d.Base}}/findings/{{.F.ID}}">{{.F.Title}}</a> <code class="muted">{{.F.ID}}</code></td><td class="path"><span class="method m-{{.F.Method}}">{{.F.Method}}</span> {{.F.Path}}</td><td class="small">{{or .Reason "–"}}</td></tr>
+{{- end}}
+</tbody>
+</table>
+</div>
+{{- else}}
+<p class="muted">{{call .T "results.suppressed.none"}}</p>
+{{- end}}
+</section>
+{{end}}

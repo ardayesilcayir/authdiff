@@ -228,3 +228,59 @@ tr.destructive td{background:var(--bad-bg)}
 .run-bar progress{flex:1 1 240px;height:14px;accent-color:var(--accent)}
 .live-findings{list-style:none;padding:0;margin:8px 0;display:flex;flex-direction:column;gap:6px}
 .live-findings li{overflow-wrap:anywhere}
+
+/* Results. The severity tally is also the severity filter. */
+.summary{margin:0 0 32px}
+.tally{display:grid;gap:0;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);overflow:hidden}
+.tally-item{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-right:1px solid var(--line);border-top:3px solid transparent;color:var(--ink);text-decoration:none;min-width:0}
+.tally-item b{font-size:1.6rem;line-height:1.15;font-weight:650;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.tally-item span{color:var(--muted);font-size:.85rem}
+a.tally-item:hover{background:var(--code);color:var(--ink)}
+a.tally-item[aria-current="true"]{background:var(--code)}
+.tally-item.sev-critical{border-top-color:var(--crit)}.tally-item.sev-critical b{color:var(--crit)}
+.tally-item.sev-high{border-top-color:var(--high)}.tally-item.sev-high b{color:var(--high)}
+.tally-item.sev-medium{border-top-color:var(--med)}.tally-item.sev-medium b{color:var(--med)}
+.tally-item.sev-low{border-top-color:var(--low)}.tally-item.sev-low b{color:var(--low)}
+.tally-item.sev-info{border-top-color:var(--info)}
+.tally-item.zero b{color:var(--muted)}
+.tally-item.stat{background:var(--bg)}
+.exports,.matrix-block,#findings,.suppressed,.history,.evidence{margin:0 0 36px}
+.exports .actions{margin-top:8px}
+
+/* Shared heatmap markup from internal/report (report.Heatmap). */
+.heatmap{--allowed-bg:var(--ok-bg);--allowed-fg:var(--ok-fg);--denied-bg:var(--code);--denied-fg:var(--muted);--unexpected-bg:var(--bad-bg);--unexpected-fg:var(--bad-fg);--error-bg:var(--warn-bg);--error-fg:var(--warn-fg)}
+.heatmap .legend{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;padding:0;list-style:none}
+.heatmap .legend .cell{min-width:0}
+.heatmap tbody th{font-weight:500;font-family:ui-monospace,"Cascadia Mono",Menlo,Consolas,monospace;font-size:.84rem}
+.heatmap td.hm{padding:4px}
+.heatmap .cell{display:flex;gap:6px;align-items:center;justify-content:center;min-width:112px;padding:6px 8px;border-radius:4px;font-size:.85rem;font-variant-numeric:tabular-nums}
+.heatmap .cell i{font-style:normal;font-weight:700}
+.heatmap .cell.allowed{background:var(--allowed-bg);color:var(--allowed-fg)}
+.heatmap .cell.denied{background:var(--denied-bg);color:var(--denied-fg)}
+.heatmap .cell.unexpected{background:var(--unexpected-bg);color:var(--unexpected-fg);font-weight:700;box-shadow:inset 0 0 0 2px var(--unexpected-fg)}
+.heatmap .cell.skipped{background:var(--surface);color:var(--muted);border:1px dashed var(--line)}
+.heatmap .cell.error{background:var(--error-bg);color:var(--error-fg)}
+
+/* Findings list and filter */
+.filters{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;margin:0 0 8px}
+.filters .field{margin:0;min-width:160px;max-width:260px;flex:1 1 160px}
+table.findings td.title,.suppressed td.title{white-space:normal;min-width:220px}
+td.title a{font-weight:600}
+
+/* Finding detail */
+.finding-head h1 .tag{vertical-align:middle;margin-right:4px}
+.finding-head .lead code{font-size:.95rem}
+.finding-grid{display:grid;gap:24px 40px;grid-template-columns:minmax(0,1fr);margin:0 0 36px}
+@media (min-width:860px){.finding-grid{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}}
+.triage{align-self:start;padding:16px 18px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+.triage .field{max-width:none}
+.exchange{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);padding:14px 16px;margin:0 0 16px}
+.exchange h3{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.exchange .status{font-family:ui-monospace,"Cascadia Mono",Menlo,Consolas,monospace;font-size:.85rem;padding:0 6px;border:1px solid var(--line);border-radius:3px}
+.ex-url{overflow-wrap:anywhere;max-width:none}
+.ex-grid{display:grid;gap:12px 16px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:860px){.ex-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.ex-grid h4{margin:0 0 6px;font-size:.85rem;color:var(--muted);font-weight:600}
+.ex-grid pre{margin:0 0 8px;max-height:480px;overflow:auto}
+.ex-grid pre.headers{color:var(--muted)}
+.history-actions{margin:0 0 12px}

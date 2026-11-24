@@ -37,6 +37,40 @@
 </section>
 </div>
 
+<section class="history" aria-labelledby="hist-h">
+<h2 id="hist-h">{{call .T "project.history"}}</h2>
+{{- with .Data.Running}}
+<div class="notice" role="status"><p>{{call $.T "project.running"}} <a href="{{.}}">{{call $.T "project.running.open"}}</a></p></div>
+{{- end}}
+{{- with index .Data.Errors "export"}}
+<div class="notice error" role="alert"><p>{{call $.T .}}</p></div>
+{{- end}}
+<div class="actions history-actions">
+{{- if or .Data.History (eq .Data.Next "plan")}}
+<form method="post" action="/p/{{$p.Name}}/scan">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<button class="btn" type="submit">{{call .T "project.rescan"}}</button>
+</form>
+{{- end}}
+<a class="btn" href="/p/{{$p.Name}}/settings">{{call .T "project.settings"}}</a>
+<a class="btn" href="/p/{{$p.Name}}/export.zip" download>{{call .T "project.export"}}</a>
+</div>
+{{- if .Data.History}}
+<div class="scroll">
+<table>
+<thead><tr><th scope="col">{{call .T "project.history.date"}}</th><th scope="col" class="num">{{call .T "project.history.findings"}}</th><th scope="col"><span class="visually-hidden">{{call .T "project.history.open"}}</span></th></tr></thead>
+<tbody>
+{{- range .Data.History}}
+<tr><td>{{.Started}}</td><td class="num" id="h-{{.ID}}">{{.Findings}}</td><td><a href="{{.Href}}">{{call $.T "project.history.open"}}</a></td></tr>
+{{- end}}
+</tbody>
+</table>
+</div>
+{{- else}}
+<p class="empty">{{call .T "project.history.empty"}}</p>
+{{- end}}
+</section>
+
 <section class="danger-zone" aria-labelledby="del-h">
 <h2 id="del-h">{{call .T "project.delete.title"}}</h2>
 <p>{{call .T "project.delete.body"}}</p>
