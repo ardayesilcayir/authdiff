@@ -3,6 +3,9 @@
 <p class="code">{{.Data.Status}}</p>
 <h1>{{call .T .Data.TitleKey}}</h1>
 <p class="lead">{{call .T .Data.BodyKey}}</p>
+{{- if and .CSRF .Data.Href}}
+<p><a class="btn primary" href="{{.Data.Href}}">{{call .T "error.409.open"}}</a></p>
+{{- end}}
 {{- if .CSRF}}
 <p><a class="btn" href="/">{{call .T "error.home"}}</a></p>
 {{- end}}

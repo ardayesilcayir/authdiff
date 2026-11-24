@@ -1,0 +1,65 @@
+{{define "content"}}
+{{- $d := .Data}}{{$p := $d.P}}
+<section class="intro">
+<h1>{{call .T "plan.title"}} <span class="muted">· {{$p.Name}}</span></h1>
+<p class="lead">{{call .T "plan.lead"}}</p>
+</section>
+{{- if $d.Err}}
+<div class="notice error" role="alert">
+<p class="err">{{call .T "plan.err.invalid"}}</p>
+<pre class="detail">{{$d.Err}}</pre>
+<p><a class="btn" href="/p/{{$p.Name}}/target">{{call .T "plan.err.fix"}}</a></p>
+</div>
+{{- else}}
+{{- if $d.Missing}}
+<div class="notice" role="status"><p>{{call .T "plan.missing"}}</p>
+<ul class="inline">{{range $d.Missing}}<li><code>{{.}}</code></li>{{end}}</ul>
+<p><a href="/p/{{$p.Name}}/profiles">{{call .T "plan.missing.link"}}</a></p></div>
+{{- end}}
+{{- with $d.Active}}
+<div class="notice" role="status"><p>{{call $.T "plan.active"}} <a href="{{.}}">{{call $.T "plan.active.link"}}</a></p></div>
+{{- end}}
+<section aria-labelledby="plan-sum-h">
+<h2 id="plan-sum-h" class="visually-hidden">{{call .T "plan.summary"}}</h2>
+<dl class="facts">
+<dt>{{call .T "plan.total"}}</dt><dd data-total="{{$d.Total}}">{{$d.Total}}</dd>
+<dt>{{call .T "plan.destructive"}}</dt><dd data-destructive="{{$d.Destructive}}">{{if $d.Destructive}}<span class="tag destructive">{{$d.Destructive}}</span>{{else}}0{{end}}</dd>
+<dt>{{call .T "plan.rate"}}</dt><dd>{{call .T "plan.rate.value" $d.Rate}}</dd>
+<dt>{{call .T "plan.eta"}}</dt><dd>{{with $d.ETA}}{{call $.T "plan.eta.value" .}}{{else}}-{{end}}</dd>
+</dl>
+<p class="hint">{{call .T "plan.eta.hint"}}</p>
+{{- if $d.Destructive}}
+{{- if $p.Safety.AllowDestructive}}
+<div class="notice error" role="status" data-mode="destructive"><p>{{call .T "plan.destructive.warn" $d.Destructive}}</p></div>
+{{- else}}
+<div class="notice" role="status" data-mode="safe"><p>{{call .T "plan.destructive.safe" $d.Destructive}}</p></div>
+{{- end}}
+{{- end}}
+<form method="post" action="/p/{{$p.Name}}/scan">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<div class="actions">
+<button class="btn primary" type="submit"{{if not $d.Total}} disabled{{end}}>{{call .T "plan.start"}}</button>
+<a class="btn" href="/p/{{$p.Name}}/settings">{{call .T "plan.edit"}}</a>
+</div>
+</form>
+</section>
+{{- if not $d.Total}}
+<p class="notice" role="status">{{call .T "plan.empty"}}</p>
+{{- end}}
+{{- range $d.Groups}}
+<section class="plan-group" aria-labelledby="rule-{{.RuleID}}">
+<h2 id="rule-{{.RuleID}}"><code>{{.RuleID}}</code> <span class="muted">{{call $.T "plan.group.count" (len .Rows)}}</span></h2>
+<div class="scroll">
+<table>
+<thead><tr><th scope="col">{{call $.T "plan.col.step"}}</th><th scope="col">{{call $.T "plan.col.profile"}}</th><th scope="col">{{call $.T "plan.col.method"}}</th><th scope="col">{{call $.T "plan.col.path"}}</th><th scope="col">{{call $.T "plan.col.destructive"}}</th></tr></thead>
+<tbody>
+{{- range .Rows}}
+<tr{{if .Destructive}} class="destructive"{{end}}><td>{{.Step}}</td><td><code>{{.Profile}}</code></td><td><code>{{.Method}}</code></td><td><code>{{.Path}}</code></td><td>{{if .Destructive}}<span class="tag destructive">{{call $.T "plan.destructive.tag"}}</span>{{else}}<span class="muted">{{call $.T "plan.safe.tag"}}</span>{{end}}</td></tr>
+{{- end}}
+</tbody>
+</table>
+</div>
+</section>
+{{- end}}
+{{- end}}
+{{end}}

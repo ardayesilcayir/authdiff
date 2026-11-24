@@ -61,6 +61,7 @@ type Server struct {
 
 	store   *Store
 	secrets *Secrets
+	runs    *RunManager
 
 	mu       sync.Mutex
 	onStop   []func(context.Context)
@@ -123,6 +124,10 @@ func New(o Options) (*Server, error) {
 		store:   &Store{root: o.ProjectsDir},
 		secrets: NewSecrets(),
 	}
+	s.runs = newRunManager(o.Version, o.Log)
+	// A running scan is cancelled and its partial results written within
+	// the shutdown budget.
+	s.OnShutdown(s.runs.Shutdown)
 	s.port.Store(int64(o.Port))
 	s.routes()
 	s.handler = s.secure(s.mux)
@@ -150,6 +155,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /p/{name}/profiles", s.handleProfiles)
 	s.mux.HandleFunc("GET /p/{name}/settings", s.handleSettingsForm)
 	s.mux.HandleFunc("POST /p/{name}/settings", s.handleSettings)
+	s.mux.HandleFunc("GET /p/{name}/plan", s.handlePlan)
+	s.mux.HandleFunc("POST /p/{name}/scan", s.handleScan)
+	s.mux.HandleFunc("GET /p/{name}/runs/{id}", s.handleRun)
+	s.mux.HandleFunc("GET /api/runs/{id}/events", s.handleRunEvents)
+	s.mux.HandleFunc("POST /api/runs/{id}/stop", s.handleStopRun)
 	s.mux.HandleFunc("/", s.handleNotFound)
 }
 

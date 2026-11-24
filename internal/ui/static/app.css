@@ -219,3 +219,12 @@ table.matrix .err{margin:4px 0 0}
 .cmd-row{flex-direction:column}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* Plan and live scan */
+.plan-group{margin:24px 0 0}
+.plan-group h2 code{font-size:.95rem}
+tr.destructive td{background:var(--bad-bg)}
+.run-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;max-width:none}
+.run-bar progress{flex:1 1 240px;height:14px;accent-color:var(--accent)}
+.live-findings{list-style:none;padding:0;margin:8px 0;display:flex;flex-direction:column;gap:6px}
+.live-findings li{overflow-wrap:anywhere}

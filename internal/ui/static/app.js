@@ -235,11 +235,168 @@
     }
   });
 
+  // --- Live scan ----------------------------------------------------------
+
+  // Run page: <section data-events="/api/runs/ID/events">. Without JS the
+  // page refreshes itself every 3 s (noscript meta refresh); with JS the
+  // counters and preliminary findings update from Server-Sent Events.
+  function localPath(p) {
+    return typeof p === "string" && p.charAt(0) === "/" && p.charAt(1) !== "/" && p.indexOf("\\") < 0;
+  }
+
+  function initRun() {
+    var root = document.querySelector("section[data-events]");
+    if (!root || typeof window.EventSource !== "function") {
+      return;
+    }
+    function field(name) {
+      return root.querySelector('[data-field="' + name + '"]');
+    }
+    function set(name, text) {
+      var el = field(name);
+      if (el) {
+        el.textContent = String(text);
+      }
+    }
+    var bar = document.getElementById("run-progress");
+    var finished = false;
+
+    function progress(d) {
+      set("sent", d.sent);
+      set("planned", d.planned);
+      set("blocked", d.blocked);
+      set("errors", d.errors);
+      set("findings", d.findings);
+      set("phase", root.getAttribute("data-phase-label") + " " + (d.phaseName || ""));
+      var parts = [];
+      Object.keys(d.severity || {}).sort().forEach(function (k) {
+        parts.push(k + " " + d.severity[k]);
+      });
+      set("severity", parts.length ? "(" + parts.join(" · ") + ")" : "");
+      if (bar) {
+        bar.value = d.percent;
+        bar.textContent = d.percent + "%";
+      }
+    }
+
+    function el(tag, cls, text) {
+      var e = document.createElement(tag);
+      if (cls) {
+        e.className = cls;
+      }
+      if (text !== undefined) {
+        e.textContent = text;
+      }
+      return e;
+    }
+
+    var seen = {};
+    each(root.querySelectorAll('[data-field="list"] li[data-id]'), function (li) {
+      seen[li.getAttribute("data-id")] = true;
+    });
+    function addFinding(f) {
+      if (seen[f.id]) {
+        return;
+      }
+      seen[f.id] = true;
+      var list = field("list");
+      if (!list) {
+        return;
+      }
+      var li = el("li");
+      li.appendChild(el("span", "muted", f.time));
+      li.appendChild(document.createTextNode(" "));
+      var sev = /^[a-z]+$/.test(f.severity) ? f.severity : "info";
+      li.appendChild(el("span", "tag " + sev, f.severity));
+      li.appendChild(document.createTextNode(" "));
+      li.appendChild(el("code", "", f.ruleId));
+      li.appendChild(document.createTextNode(" "));
+      li.appendChild(el("code", "", f.method + " " + f.path));
+      if (f.attacker) {
+        li.appendChild(document.createTextNode(" "));
+        li.appendChild(el("span", "muted", f.attacker + " → " + (f.victim || "")));
+      }
+      list.insertBefore(li, list.firstChild);
+      var empty = field("empty");
+      if (empty) {
+        empty.hidden = true;
+      }
+    }
+
+    function message(text) {
+      var m = field("message");
+      if (m) {
+        m.textContent = text;
+        m.hidden = !text;
+      }
+    }
+
+    function stopForm(hide) {
+      var f = root.querySelector("form[data-stop] button");
+      if (f) {
+        f.hidden = hide;
+      }
+    }
+
+    var es = new window.EventSource(root.getAttribute("data-events"));
+    es.addEventListener("progress", function (e) {
+      progress(JSON.parse(e.data));
+    });
+    es.addEventListener("finding", function (e) {
+      addFinding(JSON.parse(e.data));
+    });
+    es.addEventListener("done", function (e) {
+      finished = true;
+      es.close();
+      var d = JSON.parse(e.data);
+      set("sent", d.sent);
+      set("blocked", d.blocked);
+      set("errors", d.errors);
+      set("findings", d.findings);
+      if (bar) {
+        bar.value = 100;
+        bar.textContent = "100%";
+      }
+      stopForm(true);
+      var link = root.querySelector("a[data-results]");
+      if (link && localPath(d.results)) {
+        link.href = d.results;
+        link.hidden = false;
+      }
+      if (d.status === "failed") {
+        set("status", root.getAttribute("data-failed-label"));
+        message(d.message || "");
+        return;
+      }
+      set("status", root.getAttribute(d.status === "stopped" ? "data-stopped-label" : "data-done-label"));
+      if (localPath(d.results)) {
+        window.setTimeout(function () {
+          window.location.assign(d.results);
+        }, 800);
+      }
+    });
+    es.addEventListener("error", function (e) {
+      if (e.data) { // the run's own error event
+        finished = true;
+        es.close();
+        stopForm(true);
+        set("status", root.getAttribute("data-error-label"));
+        message(JSON.parse(e.data).message || "");
+        return;
+      }
+      // A connection error: EventSource retries on its own unless closed.
+      if (!finished && es.readyState === window.EventSource.CLOSED) {
+        message(root.getAttribute("data-lost-label"));
+      }
+    });
+  }
+
   function init() {
     initCopy();
     initSelectAll();
     initProfiles();
     initDestructive();
+    initRun();
   }
 
   if (document.readyState === "loading") {

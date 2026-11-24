@@ -1,0 +1,39 @@
+{{define "head"}}
+<noscript><meta http-equiv="refresh" content="3"></noscript>
+{{- end}}
+{{define "content"}}
+{{- $d := .Data}}{{$p := $d.P}}{{$g := $d.Run.Progress}}
+<section class="run" data-events="{{$d.Events}}" data-phase-label="{{call .T "run.phase.label"}}" data-done-label="{{call .T "run.status.done"}}" data-stopped-label="{{call .T "run.status.stopped"}}" data-failed-label="{{call .T "run.status.failed"}}" data-error-label="{{call .T "run.status.error"}}" data-lost-label="{{call .T "run.status.lost"}}">
+<div class="intro">
+<h1>{{call .T "run.title"}} <span class="muted">· {{$p.Name}}</span></h1>
+<p class="lead" data-field="status" role="status" aria-live="polite">{{call .T "run.status.running"}} · <span data-field="phase">{{call .T "run.phase.label"}} {{$g.PhaseName}}</span></p>
+</div>
+<p class="run-bar"><progress id="run-progress" max="100" value="{{$g.Percent}}" aria-describedby="run-count">{{$g.Percent}}%</progress>
+<span id="run-count"><span data-field="sent">{{$g.Sent}}</span> / <span data-field="planned">{{$g.Planned}}</span> {{call .T "run.requests"}}</span></p>
+<p class="hint">{{call .T "run.planned.hint"}}</p>
+<dl class="facts">
+<dt>{{call .T "run.findings"}}</dt><dd><span data-field="findings">{{$g.Findings}}</span>{{with $g.Severity}} <span class="muted" data-field="severity">({{range $k, $v := .}}{{$k}} {{$v}} {{end}})</span>{{else}} <span class="muted" data-field="severity"></span>{{end}}</dd>
+<dt>{{call .T "run.blocked"}}</dt><dd data-field="blocked">{{$g.Blocked}}</dd>
+<dt>{{call .T "run.errors"}}</dt><dd data-field="errors">{{$g.Errors}}</dd>
+</dl>
+<p class="err" data-field="message" hidden></p>
+<form method="post" action="/api/runs/{{$d.Run.ID}}/stop" data-stop>
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<div class="actions">
+<button class="btn danger" type="submit">{{call .T "run.stop"}}</button>
+<a class="btn" href="/p/{{$p.Name}}" data-results hidden>{{call .T "run.open_results"}}</a>
+</div>
+<p class="hint">{{call .T "run.stop.hint"}}</p>
+</form>
+<section aria-labelledby="live-h">
+<h2 id="live-h">{{call .T "run.live"}} <span class="tag">{{call .T "run.preliminary"}}</span></h2>
+<p class="hint">{{call .T "run.preliminary.hint"}}</p>
+<ul class="live-findings" data-field="list">
+{{- range $d.Run.Findings}}
+<li data-id="{{.ID}}"><span class="muted">{{.Time}}</span> <span class="tag {{.Severity}}">{{.Severity}}</span> <code>{{.RuleID}}</code> <code>{{.Method}} {{.Path}}</code>{{if .Attacker}} <span class="muted">{{.Attacker}} → {{.Victim}}</span>{{end}}</li>
+{{- end}}
+</ul>
+<p class="muted" data-field="empty"{{if $d.Run.Findings}} hidden{{end}}>{{call .T "run.none_yet"}}</p>
+</section>
+</section>
+{{end}}

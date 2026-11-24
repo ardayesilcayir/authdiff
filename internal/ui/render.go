@@ -117,6 +117,7 @@ type errorData struct {
 	Status   int
 	TitleKey string
 	BodyKey  string
+	Href     string // optional local link shown with the message (e.g. the running scan)
 }
 
 // errorPages holds the message keys per status; other statuses use 500's.
@@ -125,6 +126,7 @@ var errorPages = map[int]errorData{
 	http.StatusUnauthorized:        {TitleKey: "error.401.title", BodyKey: "error.401.body"},
 	http.StatusForbidden:           {TitleKey: "error.403.title", BodyKey: "error.403.body"},
 	http.StatusNotFound:            {TitleKey: "error.404.title", BodyKey: "error.404.body"},
+	http.StatusConflict:            {TitleKey: "error.409.title", BodyKey: "error.409.body"},
 	http.StatusMisdirectedRequest:  {TitleKey: "error.421.title", BodyKey: "error.421.body"},
 	http.StatusInternalServerError: {TitleKey: "error.500.title", BodyKey: "error.500.body"},
 }
